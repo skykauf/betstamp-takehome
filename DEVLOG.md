@@ -19,6 +19,17 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-02T23:55:00Z — Fix production `/api/brief` 404 (static vs Python on Vercel)
+
+**What happened**
+
+- Production returned Vercel’s plain-text `NOT_FOUND` for `POST /api/brief` while `/` still loaded the UI — consistent with a **static-only edge** for `public/index.html` and no function route for `/api/*`.
+- Moved the UI to **`static/index.html`** and serve it only through FastAPI (`FileResponse` + `StaticFiles` under `/static`). Removed the empty `public/` tree so deploys route API traffic to the Python runtime.
+- Added root **`pyproject.toml`** (mirrors `requirements.txt`) to reinforce Python project detection; **`redirect_slashes=False`** on `FastAPI` for Vercel path normalization quirks.
+- Frontend `fetch` helpers now surface non-JSON error bodies instead of `Unexpected token`.
+
+---
+
 ## 2026-04-02T23:30:00Z — Vercel build: remove bad `functions` config
 
 **What happened**
@@ -52,7 +63,7 @@ Add entries as you build. Each substantive session should touch at least one of:
 - Implemented `services/agent.py`: OpenAI tool loop, JSON-shaped briefing contract, tools `get_dataset_meta`, `list_games`, `get_odds_for_game`, staleness list, math helpers, and `run_readonly_sql` when `DATABASE_URL` is set (`services/database.py` validates single `SELECT` only; caps rows).
 - `supabase/migrations/001_init.sql` + `scripts/seed_odds.py` mirror JSON into `odds_lines` for analyst-style SQL.
 - `services/thread_store.py` persists `messages` JSON on `chat_threads` when Postgres is configured; otherwise in-memory (single-instance demo).
-- `app.py` + `public/index.html`: `/api/brief`, `/api/chat`, `/api/health`, minimal UI; `requirements.txt`, `pytest.ini`, tests for vig math and SQL validator.
+- `app.py` + `static/index.html`: `/api/brief`, `/api/chat`, `/api/health`, minimal UI; `requirements.txt`, `pytest.ini`, tests for vig math and SQL validator.
 
 **AI tools**
 
@@ -60,7 +71,7 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 **Decisions**
 
-- **FastAPI** as a single Vercel function (official pattern) vs many `/api/*.py` handlers — keeps routing and static `public/` in one place.
+- **FastAPI** as a single Vercel function (official pattern) vs many `/api/*.py` handlers — UI assets under `static/` served by the app (avoid `public/index.html` static-only trap on Vercel).
 - **Supabase** optional: JSON tools always work; SQL tool appears only when the DB is seeded and `DATABASE_URL` is set (clear failure message in tool result if misconfigured).
 - **Default model** `gpt-4o-mini` via `OPENAI_MODEL` for cost; swappable for demos.
 

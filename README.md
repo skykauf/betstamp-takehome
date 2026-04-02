@@ -18,13 +18,13 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
 | Structured briefing + book rankings | API asks the model for JSON-shaped sections (overview, anomalies, value, rankings). |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
-| Simple UI | `public/index.html` — trigger briefing, show trace, chat. |
+| Simple UI | `static/index.html` — trigger briefing, show trace, chat. |
 | Development log | `DEVLOG.md` (required by evaluators). |
 
 ## Architecture
 
 ```
-public/index.html  →  FastAPI (Vercel)  →  OpenAI (tool calls)
+static/index.html  →  FastAPI (Vercel)  →  OpenAI (tool calls)
                               ↓
                     data/sample_odds_data.json (always)
                               ↓
@@ -81,7 +81,7 @@ python scripts/seed_odds.py
 
 ### Deploy (Vercel)
 
-1. Connect the GitHub repo to Vercel — **no `vercel.json` required**; root `app.py` with a FastAPI `app` is detected automatically (avoid `functions` patterns aimed at `api/*.py`; those conflict with this layout).
+1. Connect the GitHub repo to Vercel — **no `vercel.json` required**; root `app.py` + `pyproject.toml` help Vercel detect a Python/FastAPI project. **Do not** put `index.html` in `public/` for this app: Vercel can treat that as a static-only deploy so `/api/*` never hits Python and returns `NOT_FOUND`. The UI is served from `static/` via FastAPI instead.
 2. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) in Project → Settings → Environment Variables.
 3. Deploy. The first production request after a cold start initializes Postgres (if configured) and seeds odds; then `/` and `/api/brief` work as usual.
 
@@ -98,7 +98,8 @@ Threads and messages are persisted when `DATABASE_URL` is set; otherwise the ser
 app.py                 # FastAPI entry (Vercel auto-detects root app.py)
 requirements.txt
 data/sample_odds_data.json
-public/index.html
+static/index.html
+pyproject.toml
 services/
   config.py            # env settings
   math_odds.py         # implied prob, vig, no-vig

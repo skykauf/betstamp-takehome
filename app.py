@@ -19,7 +19,9 @@ from services.odds_seed import ensure_odds_seeded
 from services.thread_store import create_thread, load_messages, save_messages
 
 ROOT = Path(__file__).resolve().parent
-PUBLIC = ROOT / "public"
+# UI lives under static/ (not public/) so Vercel does not deploy a static-only shell
+# that never routes /api/* to the Python function.
+STATIC = ROOT / "static"
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Betstamp Odds Agent API", lifespan=lifespan)
+app = FastAPI(
+    title="Betstamp Odds Agent API",
+    lifespan=lifespan,
+    redirect_slashes=False,
+)
 
 _origins = cors_origins()
 _allow_credentials = False if _origins == ["*"] else True
@@ -97,13 +103,13 @@ def api_chat(body: ChatBody):
         raise
 
 
-if PUBLIC.is_dir():
-    app.mount("/static", StaticFiles(directory=str(PUBLIC)), name="static")
+if STATIC.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
 @app.get("/")
 async def serve_index():
-    index = PUBLIC / "index.html"
+    index = STATIC / "index.html"
     if index.is_file():
         return FileResponse(index)
     return {"message": "Odds Agent API", "docs": "/docs"}
