@@ -19,6 +19,24 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T20:00:00Z — Briefing UX + demo prompts; push to GitHub
+
+**What happened**
+
+- **`templates/index.html`:** Briefing is no longer raw JSON — it renders **Market overview**, **Flagged anomalies**, **Value opportunities**, and **Sportsbook quality** (headings + lists) to match the “human analyst” narrative; fallback block if the model returns non-JSON (`raw_markdown`). Minimal extra CSS (card + section headers).
+- **Follow-up:** Example question buttons pre-fill the textarea and **send** the chat request when a `thread_id` exists; disabled while requests run. Enter-to-send on the textarea.
+- **Git:** Committed and pushed `main` to `origin` (arbitrage + agent/docs + UI in one deployable slice).
+
+**PDF / rubric alignment**
+
+- Core requirements were already met; this closes the gap on **presenting** the structured briefing clearly without heavy UI work.
+
+**If we had more time**
+
+- See separate backlog in latest session: streaming chat, optional confidence fields, richer chat formatting.
+
+---
+
 ## 2026-04-03T03:30:00Z — `scan_cross_book_arbitrage` tool
 
 **What happened**
@@ -220,3 +238,7 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 14. great! i think you forgot to add this prompt to the bottom -- might want to add that to agents.md
 
 15. don't need the full user thread in agents.md, just instructions to record the raw prompts in devlog
+
+16. awesome work so far. lets work on "Briefing UX — Keep one page, but render JSON into sections (headings + lists) so the 'human analyst' story matches the product narrative without heavy CSS." also, i'd like to have some demo follow-up questions displayed on the UI -- bonus points if clicking them populates the chat box and sents request
+
+17. push it up lets see how this works! then go back to the pdf and see if there's anything else we can improve on `@Betstamp AI Odds Agent - Take Home - FINAL.pdf`
