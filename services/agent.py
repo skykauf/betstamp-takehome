@@ -7,7 +7,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from services import database, math_odds, odds_repository
+from services import best_line, database, math_odds, odds_repository
 from services.config import openai_api_key, openai_model
 
 MAX_TOOL_ITERATIONS = 24
@@ -24,9 +24,15 @@ Rules:
 - When you cite numbers, use the math tools and show the formulas in prose (American negative: |odds|/(|odds|+100); positive: 100/(odds+100); vig = implied sum − 1).
 - If the user asks for something not in the data, say you do not have it.
 - When DATABASE tools are available, you may run SELECT queries against public odds tables to aggregate across books (e.g. stale lines by last_updated).
+- Use **best_line_for_market** when comparing prices across books for a specific game and side (spread / ML / total).
 
-Final response format:
-When you are done with tools, respond with a single JSON object (no markdown fences) containing:
+Follow-up chat — grounding (mandatory):
+- If the user asks about **staleness, last_updated, which book is oldest/newest, time gaps, specific odds, vig, best line, a named game or sportsbook, or any fact verifiable from the dataset**, you **must call at least one tool in that turn** before answering. Do **not** answer those questions from memory of the earlier briefing alone.
+- For **purely meta** questions (e.g. how the app works, what you can do) with no numeric or book-specific claims, tools are optional.
+- When you give book- or time-specific answers after using tools, cite what you queried (e.g. staleness list, best_line result).
+
+Final response format (initial briefing only):
+When you are done with tools for the **daily briefing** request, respond with a single JSON object (no markdown fences) containing:
 {
   "market_overview": string,
   "anomalies": [ { "summary": string, "game_id": string|null, "sportsbook": string|null, "detail": string } ],
@@ -34,12 +40,12 @@ When you are done with tools, respond with a single JSON object (no markdown fen
   "sportsbook_quality": [ { "rank": number, "sportsbook": string, "rationale": string } ]
 }
 
-For follow-up chat (shorter answers), you may use plain text instead of that JSON if the user asks a simple question — but for the initial daily briefing request, always use the JSON object above.
+For **follow-up** messages, reply in **plain text** (not that JSON), but still obey the tool-use rules above when the question is data-grounded.
 """
 
 
 BRIEFING_USER = """Generate today's market briefing for the sample slate.
-Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, and rank sportsbooks by how tight/reasonable their prices look on this slate.
+Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, use best_line_for_market where useful for value angles, and rank sportsbooks by how tight/reasonable their prices look on this slate.
 End with the JSON object specified in your instructions."""
 
 
@@ -84,6 +90,38 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
                 "name": "list_last_updated_for_staleness_check",
                 "description": "Flat list of (game_id, sportsbook, last_updated) for comparing timestamps across the slate.",
                 "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "best_line_for_market",
+                "description": (
+                    "Across all sportsbooks for one game, find the best American odds for a single side. "
+                    "Best = lowest implied probability (highest payout). Returns best book plus full ranking."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "game_id": {
+                            "type": "string",
+                            "description": "e.g. nba_20260320_lal_bos",
+                        },
+                        "market_side": {
+                            "type": "string",
+                            "enum": [
+                                "spread_home",
+                                "spread_away",
+                                "moneyline_home",
+                                "moneyline_away",
+                                "total_over",
+                                "total_under",
+                            ],
+                            "description": "Which side of which market to optimize.",
+                        },
+                    },
+                    "required": ["game_id", "market_side"],
+                },
             },
         },
         {
@@ -159,6 +197,11 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
                 {"game_id": g, "sportsbook": s, "last_updated": t} for g, s, t in rows
             ]
         }
+    if name == "best_line_for_market":
+        return best_line.best_line_for_side(
+            str(arguments["game_id"]),
+            str(arguments["market_side"]),
+        )
     if name == "american_to_implied":
         p = math_odds.american_to_implied_probability(int(arguments["american"]))
         return {"american": arguments["american"], "implied_probability": p}

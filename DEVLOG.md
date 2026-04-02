@@ -19,6 +19,20 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T02:15:00Z — Chat grounding rules + `best_line_for_market` tool
+
+**What happened**
+
+- **System prompt:** Added mandatory follow-up rules: questions about staleness, timestamps, books, odds, vig, best line, or any dataset-verifiable fact require **at least one tool call in that turn** — no answering from briefing memory alone. Meta questions stay tool-optional. Initial briefing still ends in the JSON object; follow-ups use plain text.
+- **Tool:** `best_line_for_market(game_id, market_side)` implemented in `services/best_line.py` — best price = **lowest implied probability** across books for `spread_home|spread_away|moneyline_home|moneyline_away|total_over|total_under`; returns `best` plus `all_books_ranked_best_to_worst`. Tests in `tests/test_best_line.py`.
+- **Briefing user message:** Nudges the model to use `best_line_for_market` for value angles.
+
+**Prompt / product**
+
+- Addresses evaluator gap where chat showed `tools: []` on factual follow-ups; aligns with rubric grounding.
+
+---
+
 ## 2026-04-03T01:30:00Z — Fix `GET /` JSON fallback: UI in `templates/` (bundled)
 
 **What happened**
@@ -156,3 +170,37 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 - Flesh out automated checks for odds math (unit tests with known inputs/outputs).
 - Add deployment and README once the minimal vertical slice (ingest → tools → briefing → chat) exists.
+
+---
+
+## Prompt evolution (full user thread)
+
+Verbatim user messages from the Cursor thread used to build this project (chronological). Documented for the take-home’s **prompt iteration / process** rubric.
+
+1. `@/Users/skylerkaufman/Downloads/Betstamp AI Odds Agent - Take Home - FINAL.pdf`  
+   can you help setup the framework for this takehome project? start with encoding rules into an agents.md and make sure to keep the dev log
+
+2. `@Betstamp AI Odds Agent - sample_odds_data.json`  
+   awesome, can you timestamp the entries in devlog and start working on wireframing the app using the linked sample data?
+
+3. looks great! i trust your placement of the sample data.  
+   can we go ahead and start implementing the project? i'd like us to first lay out the objectives and constraints clearly in a readme then we can go ahead and implement the services in a python vercel app. we have supabase postgres access we can connect to as a tool for the llm
+
+4. can we pythonically seed the odds upon site visit inside vercel? i want to reduce any manual actions
+
+5. can you debug structure for initial vercel deploy then push it up
+
+6. seems like the brief endpoint isn't working as intended
+
+7. we're using python framework
+
+8. routing still seems broken
+
+9. much better, thank you
+
+10. give me a follow up question to ask as a test
+
+11. app is looking good ! can you read the assignment again to make sure we're covering everything that's asked of us then suggesting some improvements `@/Users/skylerkaufman/Downloads/Betstamp AI Odds Agent - Take Home - FINAL.pdf`
+
+12. yes please lets implement 1+2  
+    then, can you improve 5 by putting a prompt-evolution sections at the bottom of devlog which includes ALL the prompts i've sent in this thread

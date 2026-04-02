@@ -25,8 +25,9 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 1. **Tool use / function calling** to query and analyze odds — do **not** rely on stuffing the full dataset into the model context as the primary approach.
 2. **Real calculations** with **visible math**: implied probability, vig, no-vig fair odds, best line per side. No hand-waving.
 3. **Structured daily briefing** including: market overview, flagged anomalies, top value opportunities, **sportsbook quality rankings**.
-4. **Follow-up chat** grounded in data and the briefing; accurate, not speculative.
+4. **Follow-up chat** grounded in data; data-grounded questions (books, times, odds, best line, vig) require **tool calls** in that turn — see `services/agent.py` system prompt.
 5. **Epistemic honesty**: if data is missing or the question is out of scope, say so — **do not guess**.
+6. **`best_line_for_market`:** cross-book best price for one side = lowest implied probability (`services/best_line.py`).
 
 ## UI expectations (simple is fine)
 

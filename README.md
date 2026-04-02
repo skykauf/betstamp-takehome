@@ -14,7 +14,7 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 
 | Constraint | How this repo addresses it |
 |------------|----------------------------|
-| Tool use / function calling — do not rely on dumping the full dataset into context | Agent exposes tools: list games, fetch lines by `game_id`, odds math helpers, and **read-only SQL** against Postgres when configured. |
+| Tool use / function calling — do not rely on dumping the full dataset into context | Agent exposes tools: list games, fetch lines by `game_id`, staleness list, **`best_line_for_market`**, odds math helpers, optional **read-only SQL** against Postgres. |
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
 | Structured briefing + book rankings | API asks the model for JSON-shaped sections (overview, anomalies, value, rankings). |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
@@ -107,6 +107,7 @@ services/
   config.py            # env settings
   math_odds.py         # implied prob, vig, no-vig
   odds_repository.py  # JSON + optional DB reads
+  best_line.py          # cross-book best price per game side
   odds_seed.py         # cold-start schema + idempotent seed
   database.py          # connection + safe SELECT helper
   agent.py             # tool loop + system prompt
