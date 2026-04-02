@@ -89,8 +89,9 @@ python scripts/seed_odds.py
 
 ## API sketch
 
-- **`POST /api/brief`** — Body: `{}`. Returns `{ thread_id, briefing, tool_trace, raw_markdown? }`.
-- **`POST /api/chat`** — Body: `{ "thread_id": "uuid", "message": "..." }`. Returns `{ reply, tool_trace }`.
+- **`POST /api/brief`** — Body: `{}`. Returns `{ thread_id, briefing, tool_trace, raw_markdown? }`. (Not streamed; briefing must stay valid JSON.)
+- **`POST /api/chat/stream`** — Same JSON body as chat. **SSE** (`text/event-stream`): `data: {"event":"delta","text":"..."}` for final-assistant tokens, `{"event":"tool","name",...}` while tools run, then `{"event":"done","reply","tool_trace","messages"}`. The UI uses this by default.
+- **`POST /api/chat`** — Same body; returns `{ reply, tool_trace }` in one JSON response (handy for curl/scripts).
 
 Threads and messages are persisted when `DATABASE_URL` is set; otherwise the server keeps in-memory conversation state (fine for demos, not for multi-instance production).
 

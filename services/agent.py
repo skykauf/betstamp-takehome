@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Iterator
 
 from openai import OpenAI
 
@@ -367,6 +367,163 @@ def run_agent(
         }
     )
     return msgs, msgs[-1]["content"], trace
+
+
+class _StreamToolAccumulator:
+    """Merge streamed tool_call fragments (by index) into API-shaped tool_calls."""
+
+    def __init__(self) -> None:
+        self._by_index: dict[int, dict[str, str]] = {}
+
+    def feed(self, delta_tool_calls: list[Any] | None) -> None:
+        if not delta_tool_calls:
+            return
+        for tc in delta_tool_calls:
+            idx = tc.index
+            if idx not in self._by_index:
+                self._by_index[idx] = {"id": "", "name": "", "arguments": ""}
+            if getattr(tc, "id", None):
+                self._by_index[idx]["id"] = tc.id
+            fn = getattr(tc, "function", None)
+            if fn is not None:
+                if getattr(fn, "name", None):
+                    self._by_index[idx]["name"] = fn.name
+                if getattr(fn, "arguments", None):
+                    self._by_index[idx]["arguments"] += fn.arguments
+
+    def as_api_tool_calls(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for idx in sorted(self._by_index.keys()):
+            t = self._by_index[idx]
+            out.append(
+                {
+                    "id": t["id"],
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "arguments": t["arguments"] or "{}",
+                    },
+                }
+            )
+        return out
+
+
+def run_agent_stream(
+    messages: list[dict[str, Any]],
+) -> Iterator[dict[str, Any]]:
+    """
+    Stream one chat turn (same tool loop as run_agent).
+
+    Yields SSE-friendly dicts:
+    - {"event": "delta", "text": str} — final-assistant tokens only (suppressed during tool rounds)
+    - {"event": "tool", "name": str, "arguments": dict} — before each tool execution
+    - {"event": "done", "reply": str, "tool_trace": list, "messages": list} — terminal; includes full messages for persistence
+    - {"event": "error", "message": str} — terminal without messages
+    """
+    client = OpenAI(api_key=openai_api_key())
+    model = openai_model()
+    include_sql = database.db_available()
+    tools = _tool_definitions(include_sql=include_sql)
+    msgs: list[dict[str, Any]] = [dict(m) for m in messages]
+    trace: list[dict[str, Any]] = []
+
+    for _ in range(MAX_TOOL_ITERATIONS):
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": msgs,
+            "stream": True,
+        }
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        try:
+            stream = client.chat.completions.create(**kwargs)
+        except Exception as e:
+            yield {"event": "error", "message": str(e)}
+            return
+
+        accum = _StreamToolAccumulator()
+        content_parts: list[str] = []
+        finish_reason: str | None = None
+        saw_tool_delta = False
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            ch = chunk.choices[0]
+            if ch.finish_reason:
+                finish_reason = ch.finish_reason
+            d = ch.delta
+            if d is None:
+                continue
+            if d.tool_calls:
+                saw_tool_delta = True
+                accum.feed(d.tool_calls)
+            if d.content and not saw_tool_delta:
+                content_parts.append(d.content)
+                yield {"event": "delta", "text": d.content}
+
+        full_content = "".join(content_parts)
+        tool_call_dicts = accum.as_api_tool_calls()
+
+        if tool_call_dicts:
+            msgs.append(
+                {
+                    "role": "assistant",
+                    "content": full_content or None,
+                    "tool_calls": tool_call_dicts,
+                }
+            )
+            for tcd in tool_call_dicts:
+                name = tcd["function"]["name"]
+                try:
+                    args = json.loads(tcd["function"].get("arguments") or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                yield {"event": "tool", "name": name, "arguments": args}
+                try:
+                    result = _call_tool(name, args)
+                except Exception as e:
+                    result = {"error": str(e)}
+                trace.append(
+                    {
+                        "tool": name,
+                        "arguments": args,
+                        "ok": "error" not in result,
+                    }
+                )
+                msgs.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tcd["id"],
+                        "content": json.dumps(result, default=str),
+                    }
+                )
+            continue
+
+        msgs.append({"role": "assistant", "content": full_content or ""})
+        text = full_content.strip()
+        yield {
+            "event": "done",
+            "reply": text,
+            "tool_trace": trace,
+            "messages": msgs,
+        }
+        return
+
+    msgs.append(
+        {
+            "role": "assistant",
+            "content": '{"error":"max tool iterations exceeded"}',
+        }
+    )
+    yield {
+        "event": "done",
+        "reply": msgs[-1]["content"],
+        "tool_trace": trace,
+        "messages": msgs,
+    }
 
 
 def parse_briefing_json(final_text: str) -> dict[str, Any] | None:

@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from services.agent import BRIEFING_USER, SYSTEM_PROMPT, parse_briefing_json, run_agent
+from services.agent import (
+    BRIEFING_USER,
+    SYSTEM_PROMPT,
+    parse_briefing_json,
+    run_agent,
+    run_agent_stream,
+)
 from services.config import cors_origins
 from services.odds_seed import ensure_odds_seeded
 from services.thread_store import create_thread, load_messages, save_messages
@@ -101,6 +108,40 @@ def api_chat(body: ChatBody):
         if "OPENAI_API_KEY" in str(e):
             raise HTTPException(status_code=503, detail=str(e)) from e
         raise
+
+
+@app.post("/api/chat/stream")
+def api_chat_stream(body: ChatBody):
+    existing = load_messages(body.thread_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Unknown thread_id")
+    messages = list(existing)
+    messages.append({"role": "user", "content": body.message})
+
+    def event_gen():
+        final_msgs: list | None = None
+        try:
+            for evt in run_agent_stream(messages):
+                if evt.get("event") == "done":
+                    final_msgs = evt.get("messages")
+                yield f"data: {json.dumps(evt, default=str)}\n\n"
+        except RuntimeError as e:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+        finally:
+            if final_msgs is not None:
+                save_messages(body.thread_id, final_msgs)
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 if TEMPLATES.is_dir():

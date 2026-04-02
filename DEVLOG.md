@@ -19,6 +19,19 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T23:30:00Z — Streaming chat (SSE bonus)
+
+**What happened**
+
+- **`run_agent_stream`** in `services/agent.py`: same tool loop as `run_agent`, but uses OpenAI **`stream=True`**; merges streamed `tool_calls` fragments via **`_StreamToolAccumulator`**; emits **`delta`** only when the model is not in a tool-call round (avoids flashing partial text before tools). Yields **`tool`** events before each execution and a terminal **`done`** with `messages` for persistence.
+- **`POST /api/chat/stream`** in `app.py`: **`StreamingResponse`** (`text/event-stream`), saves the thread on successful **`done`**.
+- **UI:** `fetch` + `ReadableStream` SSE parser; live agent text; `(tools running: …)` while tools execute; final `(tools: …)` JSON from `done`. **`POST /api/chat`** kept for non-streaming clients.
+- **Tests:** `tests/test_agent_stream.py` for accumulator merge behavior.
+
+**Note:** Briefing stays non-streamed so the JSON contract stays parseable server-side.
+
+---
+
 ## 2026-04-03T22:00:00Z — Briefing confidence fields (bonus)
 
 **What happened**
@@ -256,3 +269,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 17. push it up lets see how this works! then go back to the pdf and see if there's anything else we can improve on `@Betstamp AI Odds Agent - Take Home - FINAL.pdf`
 
 18. lets first implement 2: confidence fields go ahead and push i trust you
+
+19. awesome thank you! can we now try implementing streaming as a bonus?

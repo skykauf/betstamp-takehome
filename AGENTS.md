@@ -55,9 +55,9 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 
 ## Bonus (optional)
 
-- Streaming responses in chat.
-- Arbitrage detection (explicit cross-book profit guarantees).
-- Confidence scoring for flags and recommendations.
+- **Streaming** — Follow-up chat streams over **`POST /api/chat/stream`** (SSE); see `run_agent_stream` in `services/agent.py` and `templates/index.html`.
+- Arbitrage detection — `scan_cross_book_arbitrage` (`services/arbitrage.py`).
+- Confidence scoring — briefing JSON + UI (`confidence` / `confidence_basis`).
 
 ## Evaluation rubric (what reviewers weight)
 
