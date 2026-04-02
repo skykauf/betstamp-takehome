@@ -81,7 +81,7 @@ python scripts/seed_odds.py
 
 ### Deploy (Vercel)
 
-1. Connect the GitHub repo to Vercel; framework preset **Other** or auto-detect FastAPI.
+1. Connect the GitHub repo to Vercel — **no `vercel.json` required**; root `app.py` with a FastAPI `app` is detected automatically (avoid `functions` patterns aimed at `api/*.py`; those conflict with this layout).
 2. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) in Project → Settings → Environment Variables.
 3. Deploy. The first production request after a cold start initializes Postgres (if configured) and seeds odds; then `/` and `/api/brief` work as usual.
 
@@ -95,9 +95,8 @@ Threads and messages are persisted when `DATABASE_URL` is set; otherwise the ser
 ## Project layout
 
 ```
-app.py                 # FastAPI entry (Vercel)
+app.py                 # FastAPI entry (Vercel auto-detects root app.py)
 requirements.txt
-vercel.json
 data/sample_odds_data.json
 public/index.html
 services/

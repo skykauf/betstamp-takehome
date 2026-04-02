@@ -19,6 +19,15 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-02T23:30:00Z — Vercel build: remove bad `functions` config
+
+**What happened**
+
+- Deploy failed: `The pattern app.py defined in functions doesn't match any Serverless Functions inside the api directory` — Vercel’s `vercel.json` `functions` map targets **`api/**/*.py`**, not root `app.py`.
+- **Removed `vercel.json`** so Vercel uses **zero-config FastAPI** for root `app.py` (see [FastAPI on Vercel](https://vercel.com/docs/frameworks/backend/fastapi)). Re-add a `vercel.json` only if we need custom routes; then use patterns that match real paths (e.g. under `api/`) or the legacy `builds`/`routes` style from Vercel docs.
+
+---
+
 ## 2026-04-02T18:00:00Z — Auto-seed Postgres on Vercel cold start
 
 **What happened**
@@ -43,7 +52,7 @@ Add entries as you build. Each substantive session should touch at least one of:
 - Implemented `services/agent.py`: OpenAI tool loop, JSON-shaped briefing contract, tools `get_dataset_meta`, `list_games`, `get_odds_for_game`, staleness list, math helpers, and `run_readonly_sql` when `DATABASE_URL` is set (`services/database.py` validates single `SELECT` only; caps rows).
 - `supabase/migrations/001_init.sql` + `scripts/seed_odds.py` mirror JSON into `odds_lines` for analyst-style SQL.
 - `services/thread_store.py` persists `messages` JSON on `chat_threads` when Postgres is configured; otherwise in-memory (single-instance demo).
-- `app.py` + `public/index.html`: `/api/brief`, `/api/chat`, `/api/health`, minimal UI; `requirements.txt`, `vercel.json`, `pytest.ini`, tests for vig math and SQL validator.
+- `app.py` + `public/index.html`: `/api/brief`, `/api/chat`, `/api/health`, minimal UI; `requirements.txt`, `pytest.ini`, tests for vig math and SQL validator.
 
 **AI tools**
 
