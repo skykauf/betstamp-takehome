@@ -19,6 +19,18 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T22:00:00Z — Briefing confidence fields (bonus)
+
+**What happened**
+
+- **System prompt / briefing JSON:** Extended schema with **`confidence`** (`high` | `medium` | `low`) and **`confidence_basis`** on every **anomaly** and **value_opportunity**; rubric ties levels to tool evidence. Optional **`market_overview_confidence`** (+ basis) and per-row fields on **sportsbook_quality**.
+- **`BRIEFING_USER`:** Requires confidence on anomaly/value rows; optional overview and book ranks.
+- **UI (`templates/index.html`):** Renders a compact **Confidence:** line under market overview (when present) and under each anomaly, value, and book row when `confidence` and/or `confidence_basis` exist.
+- **Tests:** `tests/test_parse_briefing_json.py` ensures `parse_briefing_json` accepts the enriched object.
+- **`AGENTS.md` / `README.md`:** Documented as bonus deliverable.
+
+---
+
 ## 2026-04-03T20:00:00Z — Briefing UX + demo prompts; push to GitHub
 
 **What happened**
@@ -242,3 +254,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 16. awesome work so far. lets work on "Briefing UX — Keep one page, but render JSON into sections (headings + lists) so the 'human analyst' story matches the product narrative without heavy CSS." also, i'd like to have some demo follow-up questions displayed on the UI -- bonus points if clicking them populates the chat box and sents request
 
 17. push it up lets see how this works! then go back to the pdf and see if there's anything else we can improve on `@Betstamp AI Odds Agent - Take Home - FINAL.pdf`
+
+18. lets first implement 2: confidence fields go ahead and push i trust you

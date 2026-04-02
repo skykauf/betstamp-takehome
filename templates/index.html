@@ -41,6 +41,10 @@
     .briefing .item-title { font-weight: 500; }
     .briefing .item-meta { display: block; font-size: 0.82rem; color: #64748b; margin-top: 0.15rem; }
     .briefing .item-detail { display: block; margin-top: 0.2rem; }
+    .briefing .confidence {
+      font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; line-height: 1.35;
+    }
+    .briefing .confidence strong { color: #475569; font-weight: 600; text-transform: capitalize; }
 
     .demo-prompts { list-style: none; padding: 0; margin: 0.5rem 0 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
     .demo-q {
@@ -123,6 +127,27 @@
       parent.appendChild(span);
     }
 
+    const CONF_LEVELS = new Set(["high", "medium", "low"]);
+
+    function appendConfidence(parent, level, basis) {
+      const norm = level == null ? "" : String(level).toLowerCase().trim();
+      const b = basis == null ? "" : String(basis).trim();
+      if (!CONF_LEVELS.has(norm) && !b) return;
+      const wrap = document.createElement("div");
+      wrap.className = "confidence";
+      if (CONF_LEVELS.has(norm)) {
+        const strong = document.createElement("strong");
+        strong.textContent = "Confidence: " + norm;
+        wrap.appendChild(strong);
+      }
+      if (b) {
+        const rest = document.createElement("span");
+        rest.textContent = (CONF_LEVELS.has(norm) ? " — " : "") + b;
+        wrap.appendChild(rest);
+      }
+      parent.appendChild(wrap);
+    }
+
     function renderBriefing(data) {
       const el = $("briefing");
       clearBriefing(el);
@@ -157,6 +182,11 @@
 
       addHeading(el, "Market overview");
       addParagraph(el, overview || "—");
+      appendConfidence(
+        el,
+        data.market_overview_confidence,
+        data.market_overview_confidence_basis
+      );
 
       addHeading(el, "Flagged anomalies");
       if (!anomalies.length) {
@@ -176,6 +206,7 @@
             d.textContent = a.detail;
             li.appendChild(d);
           }
+          appendConfidence(li, a.confidence, a.confidence_basis);
           ul.appendChild(li);
         });
         el.appendChild(ul);
@@ -199,6 +230,7 @@
             d.textContent = v.math;
             li.appendChild(d);
           }
+          appendConfidence(li, v.confidence, v.confidence_basis);
           ul.appendChild(li);
         });
         el.appendChild(ul);
@@ -221,6 +253,7 @@
             d.textContent = b.rationale;
             li.appendChild(d);
           }
+          appendConfidence(li, b.confidence, b.confidence_basis);
           ol.appendChild(li);
         });
         el.appendChild(ol);

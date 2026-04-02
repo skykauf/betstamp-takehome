@@ -16,7 +16,7 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 |------------|----------------------------|
 | Tool use / function calling — do not rely on dumping the full dataset into context | Agent exposes tools: list games, fetch lines by `game_id`, staleness list, **`best_line_for_market`**, **`scan_cross_book_arbitrage`**, odds math helpers, optional **read-only SQL** against Postgres. |
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
-| Structured briefing + book rankings | API asks the model for JSON-shaped sections (overview, anomalies, value, rankings). |
+| Structured briefing + book rankings | JSON sections (overview, anomalies, value, rankings); **confidence** + **confidence_basis** on each anomaly/value row (bonus); UI renders both. |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
 | Simple UI | `templates/index.html` — served by FastAPI (`GET /`); must be bundled with the app (not only `public/`). |
 | Development log | `DEVLOG.md` (required by evaluators). |

@@ -36,10 +36,29 @@ Final response format (initial briefing only):
 When you are done with tools for the **daily briefing** request, respond with a single JSON object (no markdown fences) containing:
 {
   "market_overview": string,
-  "anomalies": [ { "summary": string, "game_id": string|null, "sportsbook": string|null, "detail": string } ],
-  "value_opportunities": [ { "summary": string, "game_id": string, "market": string, "math": string } ],
-  "sportsbook_quality": [ { "rank": number, "sportsbook": string, "rationale": string } ]
+  "market_overview_confidence": "high"|"medium"|"low"|null,
+  "market_overview_confidence_basis": string|null,
+  "anomalies": [ {
+    "summary": string, "game_id": string|null, "sportsbook": string|null, "detail": string,
+    "confidence": "high"|"medium"|"low", "confidence_basis": string
+  } ],
+  "value_opportunities": [ {
+    "summary": string, "game_id": string, "market": string, "math": string,
+    "confidence": "high"|"medium"|"low", "confidence_basis": string
+  } ],
+  "sportsbook_quality": [ {
+    "rank": number, "sportsbook": string, "rationale": string,
+    "confidence": "high"|"medium"|"low"|null, "confidence_basis": string|null
+  } ]
 }
+
+**Confidence (required on anomalies and value_opportunities):** Set **confidence** and **confidence_basis** from tool evidence, not intuition alone.
+- **high** — Direct proof from tools (e.g. concrete last_updated gaps vs staleness list, computed implieds/vig, arb scan numeric result).
+- **medium** — Clear comparison but incomplete coverage of the slate or one book missing.
+- **low** — Heuristic, thin data, or subjective read.
+Never label **high** unless **confidence_basis** names the supporting tool output or numbers.
+
+**Optional:** **market_overview_confidence** (+ basis) for the slate summary; per-row **confidence** on **sportsbook_quality** (rankings are subjective — often medium/low).
 
 For **follow-up** messages, reply in **plain text** (not that JSON), but still obey the tool-use rules above when the question is data-grounded.
 """
@@ -47,6 +66,7 @@ For **follow-up** messages, reply in **plain text** (not that JSON), but still o
 
 BRIEFING_USER = """Generate today's market briefing for the sample slate.
 Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, use best_line_for_market where useful for value angles, call scan_cross_book_arbitrage (whole slate or per game) to report any cross-book arbitrage-style edges, and rank sportsbooks by how tight/reasonable their prices look on this slate.
+Every anomaly and value_opportunity row must include confidence + confidence_basis tied to tool evidence. Optionally add market_overview_confidence fields and per-book confidence on rankings.
 End with the JSON object specified in your instructions."""
 
 

@@ -29,6 +29,7 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 5. **Epistemic honesty**: if data is missing or the question is out of scope, say so — **do not guess**.
 6. **`best_line_for_market`:** cross-book best price for one side = lowest implied probability (`services/best_line.py`).
 7. **`scan_cross_book_arbitrage`:** scan slate or one game for strict two-way arbs — best implied per side across books; totals/spreads only when line/pair matches (`services/arbitrage.py`).
+8. **Briefing JSON — confidence (bonus):** each **anomaly** and **value_opportunity** includes `confidence` (`high` | `medium` | `low`) and `confidence_basis` tied to tool evidence; optional fields on market overview and sportsbook rows (`services/agent.py` + UI in `templates/index.html`).
 
 ## UI expectations (simple is fine)
 
