@@ -19,9 +19,9 @@ from services.odds_seed import ensure_odds_seeded
 from services.thread_store import create_thread, load_messages, save_messages
 
 ROOT = Path(__file__).resolve().parent
-# UI lives under static/ (not public/) so Vercel does not deploy a static-only shell
-# that never routes /api/* to the Python function.
-STATIC = ROOT / "static"
+# On Vercel, public/index.html is served via the edge (filesystem); /api/* is routed to
+# this app by vercel.json. Locally, FileResponse still serves the same file.
+PUBLIC = ROOT / "public"
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +103,13 @@ def api_chat(body: ChatBody):
         raise
 
 
-if STATIC.is_dir():
-    app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+if PUBLIC.is_dir():
+    app.mount("/static", StaticFiles(directory=str(PUBLIC)), name="static")
 
 
 @app.get("/")
 async def serve_index():
-    index = STATIC / "index.html"
+    index = PUBLIC / "index.html"
     if index.is_file():
         return FileResponse(index)
     return {"message": "Odds Agent API", "docs": "/docs"}

@@ -18,13 +18,13 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
 | Structured briefing + book rankings | API asks the model for JSON-shaped sections (overview, anomalies, value, rankings). |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
-| Simple UI | `static/index.html` — trigger briefing, show trace, chat. |
+| Simple UI | `public/index.html` — trigger briefing, show trace, chat. |
 | Development log | `DEVLOG.md` (required by evaluators). |
 
 ## Architecture
 
 ```
-static/index.html  →  FastAPI (Vercel)  →  OpenAI (tool calls)
+public/index.html (edge) + FastAPI `app.py` (API)  →  OpenAI (tool calls)
                               ↓
                     data/sample_odds_data.json (always)
                               ↓
@@ -81,9 +81,10 @@ python scripts/seed_odds.py
 
 ### Deploy (Vercel)
 
-1. Connect the GitHub repo to Vercel — **no `vercel.json` required**; root `app.py` + `pyproject.toml` help Vercel detect a Python/FastAPI project. **Do not** put `index.html` in `public/` for this app: Vercel can treat that as a static-only deploy so `/api/*` never hits Python and returns `NOT_FOUND`. The UI is served from `static/` via FastAPI instead.
-2. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) in Project → Settings → Environment Variables.
-3. Deploy. The first production request after a cold start initializes Postgres (if configured) and seeds odds; then `/` and `/api/brief` work as usual.
+1. Connect the GitHub repo to Vercel. This repo **includes `vercel.json`** on purpose: it uses legacy **`builds` + `routes`** so `app.py` is always registered as a Python function, and a **catch‑all** sends non-static traffic (e.g. `POST /api/brief`) to that function. **`handle: filesystem`** runs first so `GET /` is served from **`public/index.html`** on the CDN (fast) while API calls still hit FastAPI.
+2. In Vercel **Project → Settings → General**, leave **Output Directory** empty unless you know you need an override. A mistaken output directory can produce all-404 deployments.
+3. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) in Project → Settings → Environment Variables.
+4. Deploy. The first production request that cold-starts `app.py` initializes Postgres (if configured) and seeds odds; `GET /` should load `public/index.html`, `POST /api/brief` should return JSON.
 
 ## API sketch
 
@@ -95,10 +96,11 @@ Threads and messages are persisted when `DATABASE_URL` is set; otherwise the ser
 ## Project layout
 
 ```
-app.py                 # FastAPI entry (Vercel auto-detects root app.py)
+vercel.json            # builds + routes: filesystem then catch-all → app.py
+app.py                 # FastAPI entry (explicit Python build target)
 requirements.txt
 data/sample_odds_data.json
-static/index.html
+public/index.html
 pyproject.toml
 services/
   config.py            # env settings

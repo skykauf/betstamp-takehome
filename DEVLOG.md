@@ -19,6 +19,20 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T00:30:00Z — Vercel: explicit `builds`/`routes` + `public/` again
+
+**What happened**
+
+- After moving the UI to `static/` only, **production `GET /` became Vercel `NOT_FOUND`** — zero-config never attached a working Python route for this project, so nothing served `/` or `/api/*`.
+- Added **`vercel.json`** (`version` 2) with `@vercel/python` **build** for root `app.py` and **routes**: `handle: filesystem` then **`/(.*)` → `app.py`**. Static files (e.g. `public/index.html`) are served from the edge first; API requests fall through to FastAPI.
+- Restored **`public/index.html`** (same UI as before); `app.py` again uses `PUBLIC` for `FileResponse` / `StaticFiles` for local `uvicorn`.
+
+**Dashboard**
+
+- If deploys are still all 404, check Vercel **Output Directory** is empty and framework isn’t forcing a static export over the repo root.
+
+---
+
 ## 2026-04-02T23:55:00Z — Fix production `/api/brief` 404 (static vs Python on Vercel)
 
 **What happened**
