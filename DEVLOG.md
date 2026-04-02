@@ -19,6 +19,16 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T03:30:00Z — `scan_cross_book_arbitrage` tool
+
+**What happened**
+
+- **`services/arbitrage.py`:** Scans moneyline, total (same line across books), and spread (same home/away pair) for strict two-way edges where **best implied per side** sums to **&lt; 1**; returns only those opportunities plus `cross_book` and an interpretation string.
+- **Agent:** Registered `scan_cross_book_arbitrage` in tool definitions and `_call_tool`; system prompt and briefing user message nudge use for arb-style reporting.
+- **Tests:** `tests/test_arbitrage.py` (synthetic ML + total cases; unknown market error path).
+
+---
+
 ## 2026-04-03T02:15:00Z — Chat grounding rules + `best_line_for_market` tool
 
 **What happened**
@@ -175,7 +185,7 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ## Prompt evolution (full user thread)
 
-Verbatim user messages from the Cursor thread used to build this project (chronological). Documented for the take-home’s **prompt iteration / process** rubric.
+Verbatim user messages from the Cursor thread used to build this project (chronological). Documented for the take-home’s **prompt iteration / process** rubric. **`AGENTS.md`** only instructs assistants to keep this section updated — the full thread lives here.
 
 1. `@/Users/skylerkaufman/Downloads/Betstamp AI Odds Agent - Take Home - FINAL.pdf`  
    can you help setup the framework for this takehome project? start with encoding rules into an agents.md and make sure to keep the dev log
@@ -204,3 +214,9 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 
 12. yes please lets implement 1+2  
     then, can you improve 5 by putting a prompt-evolution sections at the bottom of devlog which includes ALL the prompts i've sent in this thread
+
+13. this is great! working as expected. can we add the Arbitrage tool please?
+
+14. great! i think you forgot to add this prompt to the bottom -- might want to add that to agents.md
+
+15. don't need the full user thread in agents.md, just instructions to record the raw prompts in devlog

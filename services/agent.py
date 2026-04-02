@@ -7,7 +7,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from services import best_line, database, math_odds, odds_repository
+from services import arbitrage, best_line, database, math_odds, odds_repository
 from services.config import openai_api_key, openai_model
 
 MAX_TOOL_ITERATIONS = 24
@@ -25,6 +25,7 @@ Rules:
 - If the user asks for something not in the data, say you do not have it.
 - When DATABASE tools are available, you may run SELECT queries against public odds tables to aggregate across books (e.g. stale lines by last_updated).
 - Use **best_line_for_market** when comparing prices across books for a specific game and side (spread / ML / total).
+- Use **scan_cross_book_arbitrage** to find strict two-way arbs (best implied per side across books; sum < 1) on moneyline, totals (matching line), and spreads (matching pair).
 
 Follow-up chat — grounding (mandatory):
 - If the user asks about **staleness, last_updated, which book is oldest/newest, time gaps, specific odds, vig, best line, a named game or sportsbook, or any fact verifiable from the dataset**, you **must call at least one tool in that turn** before answering. Do **not** answer those questions from memory of the earlier briefing alone.
@@ -45,7 +46,7 @@ For **follow-up** messages, reply in **plain text** (not that JSON), but still o
 
 
 BRIEFING_USER = """Generate today's market briefing for the sample slate.
-Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, use best_line_for_market where useful for value angles, and rank sportsbooks by how tight/reasonable their prices look on this slate.
+Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, use best_line_for_market where useful for value angles, call scan_cross_book_arbitrage (whole slate or per game) to report any cross-book arbitrage-style edges, and rank sportsbooks by how tight/reasonable their prices look on this slate.
 End with the JSON object specified in your instructions."""
 
 
@@ -127,6 +128,35 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
+                "name": "scan_cross_book_arbitrage",
+                "description": (
+                    "Find theoretical two-way arbitrage: for each outcome, take the best (lowest implied "
+                    "prob) price across sportsbooks. If those implieds sum to under 1.0, list the opportunity. "
+                    "Supports moneyline; totals and spreads only when the line/pair matches within the game. "
+                    "Omit game_id to scan all games in the sample."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "game_id": {
+                            "type": "string",
+                            "description": "Optional. e.g. nba_20260320_lal_bos. Leave empty to scan entire slate.",
+                        },
+                        "include_markets": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": ["moneyline", "total", "spread"],
+                            },
+                            "description": "Defaults to all three if omitted or empty.",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "american_to_implied",
                 "description": "Convert one American odds price to implied probability (decimal 0–1).",
                 "parameters": {
@@ -201,6 +231,17 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
         return best_line.best_line_for_side(
             str(arguments["game_id"]),
             str(arguments["market_side"]),
+        )
+    if name == "scan_cross_book_arbitrage":
+        gid = arguments.get("game_id")
+        if isinstance(gid, str) and gid.strip() == "":
+            gid = None
+        inc = arguments.get("include_markets")
+        if isinstance(inc, list) and len(inc) == 0:
+            inc = None
+        return arbitrage.scan_cross_book_arbitrage(
+            game_id=gid,
+            include_markets=inc,
         )
     if name == "american_to_implied":
         p = math_odds.american_to_implied_probability(int(arguments["american"]))

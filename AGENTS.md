@@ -28,6 +28,7 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 4. **Follow-up chat** grounded in data; data-grounded questions (books, times, odds, best line, vig) require **tool calls** in that turn — see `services/agent.py` system prompt.
 5. **Epistemic honesty**: if data is missing or the question is out of scope, say so — **do not guess**.
 6. **`best_line_for_market`:** cross-book best price for one side = lowest implied probability (`services/best_line.py`).
+7. **`scan_cross_book_arbitrage`:** scan slate or one game for strict two-way arbs — best implied per side across books; totals/spreads only when line/pair matches (`services/arbitrage.py`).
 
 ## UI expectations (simple is fine)
 
@@ -71,6 +72,7 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 
 - Keep changes **focused** on the task; avoid unrelated refactors.
 - **Update DEVLOG.md** when making meaningful decisions, prompt changes, or AI-tool usage worth recording.
+- **Verbatim prompts:** Append **raw user messages** (chronological, numbered) to the **Prompt evolution** section at the bottom of `DEVLOG.md` — reviewers weight prompt iteration; that section is the single place for the full thread, not `AGENTS.md`.
 - Do not commit secrets; use `.env` / env vars for API keys.
 - Prefer implementations that make **tool traces and calculations inspectable** (logs, UI panel, or test assertions).
 

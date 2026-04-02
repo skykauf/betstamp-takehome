@@ -24,6 +24,32 @@
     }
     .row { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
     .muted { color: #64748b; font-size: 0.85rem; }
+
+    /* Briefing: semantic sections, no heavy chrome */
+    .briefing {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .briefing h2 {
+      font-size: 1.05rem; font-weight: 600; margin: 1.15rem 0 0.4rem;
+      border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem;
+    }
+    .briefing h2:first-child { margin-top: 0; }
+    .briefing p { margin: 0.35rem 0 0.6rem; white-space: pre-wrap; }
+    .briefing ul, .briefing ol { margin: 0.35rem 0 0.75rem; padding-left: 1.25rem; }
+    .briefing li { margin: 0.45rem 0; }
+    .briefing .item-title { font-weight: 500; }
+    .briefing .item-meta { display: block; font-size: 0.82rem; color: #64748b; margin-top: 0.15rem; }
+    .briefing .item-detail { display: block; margin-top: 0.2rem; }
+
+    .demo-prompts { list-style: none; padding: 0; margin: 0.5rem 0 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+    .demo-q {
+      width: 100%; text-align: left; background: #fff; color: #0f172a;
+      border: 1px solid #cbd5e1; padding: 0.45rem 0.65rem; border-radius: 6px;
+      font-size: 0.88rem; line-height: 1.35; cursor: pointer;
+    }
+    .demo-q:hover:not(:disabled) { border-color: #94a3b8; background: #f1f5f9; }
+    .demo-q:disabled { cursor: not-allowed; opacity: 0.55; }
   </style>
 </head>
 <body>
@@ -37,7 +63,9 @@
 
   <section>
     <h2 style="font-size:1rem;">Briefing</h2>
-    <pre id="briefing">—</pre>
+    <div id="briefing" class="briefing" aria-live="polite">
+      <p class="muted" style="margin:0;">Run a briefing to see the analyst summary.</p>
+    </div>
   </section>
 
   <section>
@@ -50,6 +78,13 @@
 
   <section>
     <h2 style="font-size:1rem;">Follow-up</h2>
+    <p class="muted" style="margin:0 0 0.25rem;">Example questions (uses your briefing thread):</p>
+    <ul class="demo-prompts" id="demo-prompts">
+      <li><button type="button" class="demo-q" data-q="Which games or sportsbooks have the stalest last_updated timestamps compared to the rest of the slate?" disabled>Show me stale lines — who is oldest vs the field?</button></li>
+      <li><button type="button" class="demo-q" data-q="For game nba_20260320_lal_bos, what is the best moneyline price for the away team (Lakers) across all books, and what implied probability does that imply?" disabled>Best Lakers moneyline across books (with math)</button></li>
+      <li><button type="button" class="demo-q" data-q="Scan the full slate with scan_cross_book_arbitrage. Are there any strict two-way arbitrage opportunities? If so, summarize each; if none, say so." disabled>Any cross-book arbitrage on the full slate?</button></li>
+      <li><button type="button" class="demo-q" data-q="Call list_last_updated_for_staleness_check and tell me the single oldest last_updated row and how far it lags behind the newest." disabled>Quantify oldest vs newest last_updated</button></li>
+    </ul>
     <textarea id="chat-input" placeholder="Ask about the briefing…" disabled></textarea>
     <p><button type="button" id="send-chat" disabled>Send</button></p>
     <pre id="chat-log">—</pre>
@@ -58,6 +93,145 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let threadId = null;
+
+    function asArray(x) {
+      return Array.isArray(x) ? x : [];
+    }
+
+    function clearBriefing(el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function addHeading(parent, text) {
+      const h = document.createElement("h2");
+      h.textContent = text;
+      parent.appendChild(h);
+    }
+
+    function addParagraph(parent, text) {
+      const p = document.createElement("p");
+      p.textContent = text == null ? "" : String(text);
+      parent.appendChild(p);
+    }
+
+    function addMetaLine(parent, parts) {
+      const bits = parts.filter(Boolean);
+      if (!bits.length) return;
+      const span = document.createElement("span");
+      span.className = "item-meta";
+      span.textContent = bits.join(" · ");
+      parent.appendChild(span);
+    }
+
+    function renderBriefing(data) {
+      const el = $("briefing");
+      clearBriefing(el);
+
+      const rawOnly =
+        data &&
+        typeof data.raw_markdown === "string" &&
+        data.raw_markdown.length > 0 &&
+        typeof data.market_overview !== "string";
+
+      if (rawOnly) {
+        addHeading(el, "Briefing (unparsed)");
+        const pre = document.createElement("pre");
+        pre.className = "trace";
+        pre.style.marginTop = "0.5rem";
+        pre.textContent = data.raw_markdown;
+        el.appendChild(pre);
+        const hint = document.createElement("p");
+        hint.className = "muted";
+        hint.style.marginTop = "0.75rem";
+        hint.textContent =
+          "The model did not return pure JSON; showing raw text. You can still ask follow-ups.";
+        el.appendChild(hint);
+        return;
+      }
+
+      const overview = typeof data.market_overview === "string" ? data.market_overview : "";
+      const anomalies = asArray(data.anomalies);
+      const values = asArray(data.value_opportunities);
+      let books = asArray(data.sportsbook_quality);
+      books = [...books].sort((a, b) => (Number(a.rank) || 0) - (Number(b.rank) || 0));
+
+      addHeading(el, "Market overview");
+      addParagraph(el, overview || "—");
+
+      addHeading(el, "Flagged anomalies");
+      if (!anomalies.length) {
+        addParagraph(el, "None called out.");
+      } else {
+        const ul = document.createElement("ul");
+        anomalies.forEach((a) => {
+          const li = document.createElement("li");
+          const title = document.createElement("span");
+          title.className = "item-title";
+          title.textContent = a.summary || "Anomaly";
+          li.appendChild(title);
+          addMetaLine(li, [a.game_id, a.sportsbook].filter((x) => x != null && x !== ""));
+          if (a.detail) {
+            const d = document.createElement("span");
+            d.className = "item-detail";
+            d.textContent = a.detail;
+            li.appendChild(d);
+          }
+          ul.appendChild(li);
+        });
+        el.appendChild(ul);
+      }
+
+      addHeading(el, "Value opportunities");
+      if (!values.length) {
+        addParagraph(el, "None highlighted.");
+      } else {
+        const ul = document.createElement("ul");
+        values.forEach((v) => {
+          const li = document.createElement("li");
+          const title = document.createElement("span");
+          title.className = "item-title";
+          title.textContent = v.summary || "Opportunity";
+          li.appendChild(title);
+          addMetaLine(li, [v.game_id, v.market].filter((x) => x != null && x !== ""));
+          if (v.math) {
+            const d = document.createElement("span");
+            d.className = "item-detail";
+            d.textContent = v.math;
+            li.appendChild(d);
+          }
+          ul.appendChild(li);
+        });
+        el.appendChild(ul);
+      }
+
+      addHeading(el, "Sportsbook quality");
+      if (!books.length) {
+        addParagraph(el, "No ranking returned.");
+      } else {
+        const ol = document.createElement("ol");
+        books.forEach((b) => {
+          const li = document.createElement("li");
+          const title = document.createElement("span");
+          title.className = "item-title";
+          title.textContent = b.sportsbook || "Book";
+          li.appendChild(title);
+          if (b.rationale) {
+            const d = document.createElement("span");
+            d.className = "item-detail";
+            d.textContent = b.rationale;
+            li.appendChild(d);
+          }
+          ol.appendChild(li);
+        });
+        el.appendChild(ol);
+      }
+    }
+
+    function setDemoPromptsEnabled(on) {
+      document.querySelectorAll(".demo-q").forEach((btn) => {
+        btn.disabled = !on;
+      });
+    }
 
     async function parseJsonResponse(r) {
       const text = await r.text();
@@ -72,32 +246,13 @@
       $("run-brief").disabled = b;
       $("send-chat").disabled = b || !threadId;
       $("chat-input").disabled = b || !threadId;
+      if (threadId && !b) setDemoPromptsEnabled(true);
+      else if (!threadId || b) setDemoPromptsEnabled(false);
     }
 
-    $("run-brief").onclick = async () => {
-      setBusy(true);
-      $("briefing").textContent = "Loading…";
-      $("trace").textContent = "—";
-      try {
-        const r = await fetch("/api/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        const data = await parseJsonResponse(r);
-        if (!r.ok) throw new Error(data.detail || r.statusText);
-        threadId = data.thread_id;
-        $("thread-label").textContent = "thread: " + threadId;
-        $("briefing").textContent = JSON.stringify(data.briefing, null, 2);
-        $("trace").textContent = JSON.stringify(data.tool_trace, null, 2);
-        $("trace-wrap").open = true;
-        $("chat-log").textContent = "—";
-      } catch (e) {
-        $("briefing").textContent = "Error: " + e.message;
-      } finally {
-        setBusy(false);
-      }
-    };
-
-    $("send-chat").onclick = async () => {
-      const text = $("chat-input").value.trim();
-      if (!text || !threadId) return;
+    async function sendChatMessage(text) {
+      const t = (text || "").trim();
+      if (!t || !threadId) return;
       setBusy(true);
       const prev = $("chat-log").textContent;
       $("chat-log").textContent = "Thinking…";
@@ -105,13 +260,13 @@
         const r = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ thread_id: threadId, message: text }),
+          body: JSON.stringify({ thread_id: threadId, message: t }),
         });
         const data = await parseJsonResponse(r);
         if (!r.ok) throw new Error(data.detail || r.statusText);
         $("chat-log").textContent =
           (prev && prev !== "—" ? prev + "\n\n---\n\n" : "") +
-          "You: " + text + "\n\nAgent: " + data.reply +
+          "You: " + t + "\n\nAgent: " + data.reply +
           "\n\n(tools: " + JSON.stringify(data.tool_trace) + ")";
         $("chat-input").value = "";
       } catch (e) {
@@ -119,7 +274,56 @@
       } finally {
         setBusy(false);
       }
+    }
+
+    $("run-brief").onclick = async () => {
+      setBusy(true);
+      threadId = null;
+      setDemoPromptsEnabled(false);
+      clearBriefing($("briefing"));
+      $("briefing").appendChild(document.createElement("p")).textContent = "Loading…";
+      $("briefing").lastChild.className = "muted";
+      $("briefing").lastChild.style.margin = "0";
+      $("trace").textContent = "—";
+      $("thread-label").textContent = "";
+      try {
+        const r = await fetch("/api/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await parseJsonResponse(r);
+        if (!r.ok) throw new Error(data.detail || r.statusText);
+        threadId = data.thread_id;
+        $("thread-label").textContent = "thread: " + threadId;
+        renderBriefing(data.briefing || {});
+        $("trace").textContent = JSON.stringify(data.tool_trace, null, 2);
+        $("trace-wrap").open = true;
+        $("chat-log").textContent = "—";
+      } catch (e) {
+        clearBriefing($("briefing"));
+        const p = document.createElement("p");
+        p.className = "muted";
+        p.textContent = "Error: " + e.message;
+        $("briefing").appendChild(p);
+      } finally {
+        setBusy(false);
+      }
     };
+
+    $("send-chat").onclick = () => sendChatMessage($("chat-input").value);
+
+    $("chat-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage($("chat-input").value);
+      }
+    });
+
+    document.getElementById("demo-prompts").addEventListener("click", (e) => {
+      const btn = e.target.closest(".demo-q");
+      if (!btn || btn.disabled) return;
+      const q = btn.getAttribute("data-q");
+      if (!q) return;
+      $("chat-input").value = q;
+      sendChatMessage(q);
+    });
   </script>
 </body>
 </html>
