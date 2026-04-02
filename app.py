@@ -93,6 +93,54 @@ def api_brief():
         raise
 
 
+@app.post("/api/brief/stream")
+def api_brief_stream():
+    """SSE: same tool loop as /api/brief; streams tool/delta events, then brief_done with parsed JSON."""
+
+    def event_gen():
+        tid = create_thread()
+        msgs: list = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": BRIEFING_USER},
+        ]
+        yield f"data: {json.dumps({'event': 'start', 'thread_id': tid})}\n\n"
+        final_messages: list | None = None
+        last_reply = ""
+        last_trace: list = []
+        try:
+            for evt in run_agent_stream(msgs):
+                if evt.get("event") == "done":
+                    final_messages = evt.get("messages")
+                    last_reply = evt.get("reply", "") or ""
+                    last_trace = evt.get("tool_trace") or []
+                    continue
+                yield f"data: {json.dumps(evt, default=str)}\n\n"
+        except RuntimeError as e:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            return
+        except Exception as e:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            return
+
+        if final_messages is not None:
+            save_messages(tid, final_messages)
+            structured = parse_briefing_json(last_reply)
+            briefing_payload = (
+                structured if structured is not None else {"raw_markdown": last_reply}
+            )
+            yield f"data: {json.dumps({'event': 'brief_done', 'thread_id': tid, 'briefing': briefing_payload, 'tool_trace': last_trace}, default=str)}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/api/chat")
 def api_chat(body: ChatBody):
     existing = load_messages(body.thread_id)

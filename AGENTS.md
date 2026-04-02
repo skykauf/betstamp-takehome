@@ -55,7 +55,7 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 
 ## Bonus (optional)
 
-- **Streaming** — Follow-up chat streams over **`POST /api/chat/stream`** (SSE); see `run_agent_stream` in `services/agent.py` and `templates/index.html`.
+- **Streaming** — **`POST /api/chat/stream`** and **`POST /api/brief/stream`** (SSE); initial briefing shows live tool calls, then **`brief_done`** with parsed JSON (`run_agent_stream` in `services/agent.py`, `templates/index.html`).
 - Arbitrage detection — `scan_cross_book_arbitrage` (`services/arbitrage.py`).
 - Confidence scoring — briefing JSON + UI (`confidence` / `confidence_basis`).
 

@@ -89,7 +89,8 @@ python scripts/seed_odds.py
 
 ## API sketch
 
-- **`POST /api/brief`** — Body: `{}`. Returns `{ thread_id, briefing, tool_trace, raw_markdown? }`. (Not streamed; briefing must stay valid JSON.)
+- **`POST /api/brief`** — Body: `{}`. Returns `{ thread_id, briefing, tool_trace }` in one JSON response (non-streaming).
+- **`POST /api/brief/stream`** — Body: `{}`. **SSE**: `start` (with `thread_id`), then `tool` / `delta` like chat, then **`brief_done`** with `{ thread_id, briefing, tool_trace }` after the model finishes and the server parses JSON. UI uses this for live briefing tool visibility.
 - **`POST /api/chat/stream`** — Same JSON body as chat. **SSE** (`text/event-stream`): `data: {"event":"delta","text":"..."}` for final-assistant tokens, `{"event":"tool","name",...}` while tools run, then `{"event":"done","reply","tool_trace","messages"}`. The UI uses this by default.
 - **`POST /api/chat`** — Same body; returns `{ reply, tool_trace }` in one JSON response (handy for curl/scripts).
 

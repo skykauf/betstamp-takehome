@@ -19,6 +19,15 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T00:15:00Z — Streaming briefing (`/api/brief/stream` + activity panel)
+
+**What happened**
+
+- **`POST /api/brief/stream`:** Reuses **`run_agent_stream`** with the usual system + briefing user messages; forwards **`tool`** and **`delta`** SSE events; absorbs the internal **`done`** and emits **`brief_done`** with parsed **`briefing`**, **`tool_trace`**, and **`thread_id`** after **`save_messages`**.
+- **UI:** **Briefing activity** section lists each tool call as it runs; optional **Model output (streaming)** pre shows final JSON tokens; section hides when **`brief_done`** arrives (full trace remains under Agent activity). **Run daily briefing** now uses the stream endpoint.
+
+---
+
 ## 2026-04-03T23:30:00Z — Streaming chat (SSE bonus)
 
 **What happened**
@@ -271,3 +280,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 18. lets first implement 2: confidence fields go ahead and push i trust you
 
 19. awesome thank you! can we now try implementing streaming as a bonus?
+
+20. Yes that sounds nice `/api/brief/stream` + a small briefing "activity" panel so tool calls are visible during the initial run too.

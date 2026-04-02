@@ -55,16 +55,36 @@
     .demo-q:hover:not(:disabled) { border-color: #94a3b8; background: #f1f5f9; }
     .demo-q:disabled { cursor: not-allowed; opacity: 0.55; }
     #chat-log { white-space: pre-wrap; word-break: break-word; }
+
+    #briefing-activity-section { display: none; }
+    #briefing-activity-section.is-live { display: block; }
+    .briefing-tool-list {
+      list-style: none; padding: 0; margin: 0; font-size: 0.86rem;
+    }
+    .briefing-tool-list li {
+      padding: 0.4rem 0.6rem; margin: 0.3rem 0; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      font-family: ui-monospace, monospace; word-break: break-all;
+    }
+    #briefing-draft { max-height: 14rem; margin-top: 0.35rem; }
   </style>
 </head>
 <body>
   <h1>Odds Agent</h1>
-  <p class="muted">Sample slate briefing + follow-up chat. Chat uses <strong>streaming</strong> (SSE); open agent activity for the full tool trace.</p>
+  <p class="muted">Briefing and chat use <strong>SSE streaming</strong>. Watch <strong>Briefing activity</strong> for live tool calls; the structured summary renders when JSON is complete.</p>
 
   <div class="row">
     <button type="button" id="run-brief">Run daily briefing</button>
     <span class="muted" id="thread-label"></span>
   </div>
+
+  <section id="briefing-activity-section" aria-live="polite">
+    <h2 style="font-size:1rem;">Briefing activity</h2>
+    <p class="muted" style="margin:0 0 0.35rem;">Tools as they run (final JSON streams at the end — sections appear after parsing).</p>
+    <ul id="briefing-tools-live" class="briefing-tool-list"></ul>
+    <p class="muted" id="briefing-draft-label" style="display:none;margin:0.65rem 0 0.25rem;">Model output (streaming)</p>
+    <pre class="trace" id="briefing-draft" style="display:none;">…</pre>
+  </section>
 
   <section>
     <h2 style="font-size:1rem;">Briefing</h2>
@@ -267,6 +287,31 @@
       });
     }
 
+    function resetBriefingActivityPanel() {
+      const sec = $("briefing-activity-section");
+      sec.classList.add("is-live");
+      $("briefing-tools-live").textContent = "";
+      $("briefing-draft").textContent = "";
+      $("briefing-draft").style.display = "none";
+      $("briefing-draft-label").style.display = "none";
+    }
+
+    function hideBriefingActivityPanel() {
+      $("briefing-activity-section").classList.remove("is-live");
+    }
+
+    function appendBriefingToolLine(name, args) {
+      const ul = $("briefing-tools-live");
+      const li = document.createElement("li");
+      let line = name || "tool";
+      if (args && typeof args === "object" && Object.keys(args).length) {
+        const s = JSON.stringify(args);
+        line += s.length > 120 ? " " + s.slice(0, 117) + "…" : " " + s;
+      }
+      li.textContent = line;
+      ul.appendChild(li);
+    }
+
     async function parseJsonResponse(r) {
       const text = await r.text();
       const ct = r.headers.get("content-type") || "";
@@ -384,27 +429,72 @@
       threadId = null;
       setDemoPromptsEnabled(false);
       clearBriefing($("briefing"));
-      $("briefing").appendChild(document.createElement("p")).textContent = "Loading…";
-      $("briefing").lastChild.className = "muted";
-      $("briefing").lastChild.style.margin = "0";
+      const waitP = document.createElement("p");
+      waitP.className = "muted";
+      waitP.style.margin = "0";
+      waitP.textContent = "Waiting for structured briefing…";
+      $("briefing").appendChild(waitP);
       $("trace").textContent = "—";
-      $("thread-label").textContent = "";
+      $("thread-label").textContent = "Generating briefing…";
+      resetBriefingActivityPanel();
+      let gotBriefDone = false;
       try {
-        const r = await fetch("/api/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        const data = await parseJsonResponse(r);
-        if (!r.ok) throw new Error(data.detail || r.statusText);
-        threadId = data.thread_id;
-        $("thread-label").textContent = "thread: " + threadId;
-        renderBriefing(data.briefing || {});
-        $("trace").textContent = JSON.stringify(data.tool_trace, null, 2);
-        $("trace-wrap").open = true;
-        $("chat-log").textContent = "—";
+        const r = await fetch("/api/brief/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: "{}",
+        });
+        if (!r.ok) {
+          const errBody = await r.text();
+          let msg = errBody;
+          try {
+            const j = JSON.parse(errBody);
+            if (j.detail) msg = Array.isArray(j.detail) ? JSON.stringify(j.detail) : j.detail;
+          } catch (_) {}
+          throw new Error(String(msg).slice(0, 400));
+        }
+        await readSseEvents(r, (evt) => {
+          if (evt.event === "error") {
+            throw new Error(evt.message || "Briefing stream error");
+          }
+          if (evt.event === "start" && evt.thread_id) {
+            /* thread reserved server-side; enable chat only after brief_done */
+          }
+          if (evt.event === "tool" && evt.name) {
+            appendBriefingToolLine(evt.name, evt.arguments);
+          }
+          if (evt.event === "delta" && evt.text) {
+            const pre = $("briefing-draft");
+            const lab = $("briefing-draft-label");
+            pre.style.display = "block";
+            lab.style.display = "block";
+            pre.textContent += evt.text;
+          }
+          if (evt.event === "brief_done") {
+            gotBriefDone = true;
+            threadId = evt.thread_id;
+            $("thread-label").textContent = "thread: " + threadId;
+            renderBriefing(evt.briefing || {});
+            $("trace").textContent = JSON.stringify(evt.tool_trace || [], null, 2);
+            $("trace-wrap").open = true;
+            $("chat-log").textContent = "—";
+            hideBriefingActivityPanel();
+          }
+        });
+        if (!gotBriefDone) {
+          throw new Error("Stream ended before briefing completed.");
+        }
       } catch (e) {
+        hideBriefingActivityPanel();
         clearBriefing($("briefing"));
         const p = document.createElement("p");
         p.className = "muted";
         p.textContent = "Error: " + e.message;
         $("briefing").appendChild(p);
+        $("thread-label").textContent = "";
       } finally {
         setBusy(false);
       }
