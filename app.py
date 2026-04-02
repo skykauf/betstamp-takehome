@@ -19,9 +19,9 @@ from services.odds_seed import ensure_odds_seeded
 from services.thread_store import create_thread, load_messages, save_messages
 
 ROOT = Path(__file__).resolve().parent
-# On Vercel, public/index.html is served via the edge (filesystem); /api/* is routed to
-# this app by vercel.json. Locally, FileResponse still serves the same file.
-PUBLIC = ROOT / "public"
+# UI must live outside public/: Vercel does not ship public/ inside the Python function
+# bundle, so FileResponse(public/index.html) fails at runtime and falls back to JSON.
+TEMPLATES = ROOT / "templates"
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +103,14 @@ def api_chat(body: ChatBody):
         raise
 
 
-if PUBLIC.is_dir():
-    app.mount("/static", StaticFiles(directory=str(PUBLIC)), name="static")
+if TEMPLATES.is_dir():
+    app.mount("/static", StaticFiles(directory=str(TEMPLATES)), name="static")
 
 
 @app.get("/")
 async def serve_index():
-    index = PUBLIC / "index.html"
+    index = TEMPLATES / "index.html"
     if index.is_file():
         return FileResponse(index)
-    return {"message": "Odds Agent API", "docs": "/docs"}
+    logger.error("Missing templates/index.html at %s", index)
+    return {"message": "Odds Agent API", "docs": "/docs", "error": "templates/index.html missing"}

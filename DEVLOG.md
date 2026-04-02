@@ -19,6 +19,16 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T01:30:00Z — Fix `GET /` JSON fallback: UI in `templates/` (bundled)
+
+**What happened**
+
+- Production showed `{"message":"Odds Agent API","docs":"/docs"}` on `/` — the FastAPI branch when **`index.html` is missing**. **`public/` is not packaged into the Python serverless bundle** on Vercel, so `FileResponse(public/index.html)` never found a file.
+- Moved the UI to **`templates/index.html`** and serve **`GET /`** from there; **`StaticFiles`** uses the same directory for `/static` assets.
+- **`vercel.json`**: dropped deprecated **`handle: filesystem`**; single catch‑all **`/(.*)` → `app.py`** so routing is consistent (all paths hit FastAPI, which serves HTML + API).
+
+---
+
 ## 2026-04-03T01:00:00Z — Align `vercel.json` with Python / FastAPI framework preset
 
 **What happened**

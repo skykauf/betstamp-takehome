@@ -3,8 +3,5 @@
   "framework": "fastapi",
   "version": 2,
   "builds": [{ "src": "app.py", "use": "@vercel/python" }],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "app.py" }
-  ]
+  "routes": [{ "src": "/(.*)", "dest": "app.py" }]
 }
