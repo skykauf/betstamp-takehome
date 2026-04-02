@@ -1,4 +1,12 @@
-"""Chat thread persistence: Postgres when DATABASE_URL is set, else in-process (single instance)."""
+"""
+Chat thread persistence: Postgres when DATABASE_URL is set, else in-process dict.
+
+**In-memory mode** (`DATABASE_URL` unset): threads live in `_memory_threads` for this Python
+process only — fine for a single-instance demo or local dev; **not** shared across Vercel
+instances or workers. Use Postgres for multi-instance deployments.
+
+**Postgres mode**: one row per thread in `chat_threads`; `messages` is JSONB updated on each turn.
+"""
 
 from __future__ import annotations
 

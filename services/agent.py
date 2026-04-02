@@ -3,228 +3,127 @@
 from __future__ import annotations
 
 import json
+import logging
+from pathlib import Path
 from typing import Any, Iterator
 
 from openai import OpenAI
 
 from services import arbitrage, best_line, database, math_odds, odds_repository
-from services.config import openai_api_key, openai_model
+from services.briefing_schema import parse_briefing_json
+from services.config import max_tool_iterations, openai_api_key, openai_model
+from services.tool_schemas import function_tool
 
-MAX_TOOL_ITERATIONS = 24
+logger = logging.getLogger(__name__)
+
 SQL_ROW_CAP = 200
 
-SYSTEM_PROMPT = """You are a senior sports betting markets analyst assistant for Betstamp.
-
-You work ONLY from:
-- Tool results that read the sample NBA odds dataset (JSON file on the server, optionally mirrored in Postgres).
-- Arithmetic you obtain via the provided math tools (implied probability, vig, fair probabilities).
-
-Rules:
-- Use tools to fetch data in small slices (e.g. one game_id at a time). Never invent games, books, or prices.
-- When you cite numbers, use the math tools and show the formulas in prose (American negative: |odds|/(|odds|+100); positive: 100/(odds+100); vig = implied sum − 1).
-- If the user asks for something not in the data, say you do not have it.
-- When DATABASE tools are available, you may run SELECT queries against public odds tables to aggregate across books (e.g. stale lines by last_updated).
-- Use **best_line_for_market** when comparing prices across books for a specific game and side (spread / ML / total).
-- Use **scan_cross_book_arbitrage** to find strict two-way arbs (best implied per side across books; sum < 1) on moneyline, totals (matching line), and spreads (matching pair).
-
-Follow-up chat — grounding (mandatory):
-- If the user asks about **staleness, last_updated, which book is oldest/newest, time gaps, specific odds, vig, best line, a named game or sportsbook, or any fact verifiable from the dataset**, you **must call at least one tool in that turn** before answering. Do **not** answer those questions from memory of the earlier briefing alone.
-- For **purely meta** questions (e.g. how the app works, what you can do) with no numeric or book-specific claims, tools are optional.
-- When you give book- or time-specific answers after using tools, cite what you queried (e.g. staleness list, best_line result).
-
-Final response format (initial briefing only):
-When you are done with tools for the **daily briefing** request, respond with a single JSON object (no markdown fences) containing:
-{
-  "market_overview": string,
-  "market_overview_confidence": "high"|"medium"|"low"|null,
-  "market_overview_confidence_basis": string|null,
-  "anomalies": [ {
-    "summary": string, "game_id": string|null, "sportsbook": string|null, "detail": string,
-    "confidence": "high"|"medium"|"low", "confidence_basis": string
-  } ],
-  "value_opportunities": [ {
-    "summary": string, "game_id": string, "market": string, "math": string,
-    "confidence": "high"|"medium"|"low", "confidence_basis": string
-  } ],
-  "sportsbook_quality": [ {
-    "rank": number, "sportsbook": string, "rationale": string,
-    "confidence": "high"|"medium"|"low"|null, "confidence_basis": string|null
-  } ]
-}
-
-**Confidence (required on anomalies and value_opportunities):** Set **confidence** and **confidence_basis** from tool evidence, not intuition alone.
-- **high** — Direct proof from tools (e.g. concrete last_updated gaps vs staleness list, computed implieds/vig, arb scan numeric result).
-- **medium** — Clear comparison but incomplete coverage of the slate or one book missing.
-- **low** — Heuristic, thin data, or subjective read.
-Never label **high** unless **confidence_basis** names the supporting tool output or numbers.
-
-**Optional:** **market_overview_confidence** (+ basis) for the slate summary; per-row **confidence** on **sportsbook_quality** (rankings are subjective — often medium/low).
-
-For **follow-up** messages, reply in **plain text** (not that JSON), but still obey the tool-use rules above when the question is data-grounded.
-"""
-
-
-BRIEFING_USER = """Generate today's market briefing for the sample slate.
-Use tools to inspect games and lines, detect stale last_updated outliers and off-market prices vs other books, compute vig and implieds where helpful, use best_line_for_market where useful for value angles, call scan_cross_book_arbitrage (whole slate or per game) to report any cross-book arbitrage-style edges, and rank sportsbooks by how tight/reasonable their prices look on this slate.
-Every anomaly and value_opportunity row must include confidence + confidence_basis tied to tool evidence. Optionally add market_overview_confidence fields and per-book confidence on rankings.
-End with the JSON object specified in your instructions."""
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+SYSTEM_PROMPT = (_PROMPTS_DIR / "system_prompt.md").read_text(encoding="utf-8").strip()
+BRIEFING_USER = (_PROMPTS_DIR / "briefing_user.md").read_text(encoding="utf-8").strip()
 
 
 def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
     tools: list[dict[str, Any]] = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_dataset_meta",
-                "description": "Metadata about the loaded odds file (record count, notes, generated timestamp).",
-                "parameters": {"type": "object", "properties": {}},
+        function_tool(
+            "get_dataset_meta",
+            "Metadata about the loaded odds file (record count, notes, generated timestamp).",
+        ),
+        function_tool(
+            "list_games",
+            "List all games in the sample with game_id, teams, commence_time.",
+        ),
+        function_tool(
+            "get_odds_for_game",
+            "Return all sportsbook rows for one game_id (spreads, moneylines, totals, last_updated).",
+            properties={
+                "game_id": {
+                    "type": "string",
+                    "description": "e.g. nba_20260320_lal_bos",
+                }
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_games",
-                "description": "List all games in the sample with game_id, teams, commence_time.",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "get_odds_for_game",
-                "description": "Return all sportsbook rows for one game_id (spreads, moneylines, totals, last_updated).",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "game_id": {
-                            "type": "string",
-                            "description": "e.g. nba_20260320_lal_bos",
-                        }
-                    },
-                    "required": ["game_id"],
+            required=["game_id"],
+        ),
+        function_tool(
+            "list_last_updated_for_staleness_check",
+            "Flat list of (game_id, sportsbook, last_updated) for comparing timestamps across the slate.",
+        ),
+        function_tool(
+            "best_line_for_market",
+            (
+                "Across all sportsbooks for one game, find the best American odds for a single side. "
+                "Best = lowest implied probability (highest payout). Returns best book plus full ranking."
+            ),
+            properties={
+                "game_id": {"type": "string", "description": "e.g. nba_20260320_lal_bos"},
+                "market_side": {
+                    "type": "string",
+                    "enum": [
+                        "spread_home",
+                        "spread_away",
+                        "moneyline_home",
+                        "moneyline_away",
+                        "total_over",
+                        "total_under",
+                    ],
+                    "description": "Which side of which market to optimize.",
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_last_updated_for_staleness_check",
-                "description": "Flat list of (game_id, sportsbook, last_updated) for comparing timestamps across the slate.",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "best_line_for_market",
-                "description": (
-                    "Across all sportsbooks for one game, find the best American odds for a single side. "
-                    "Best = lowest implied probability (highest payout). Returns best book plus full ranking."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "game_id": {
-                            "type": "string",
-                            "description": "e.g. nba_20260320_lal_bos",
-                        },
-                        "market_side": {
-                            "type": "string",
-                            "enum": [
-                                "spread_home",
-                                "spread_away",
-                                "moneyline_home",
-                                "moneyline_away",
-                                "total_over",
-                                "total_under",
-                            ],
-                            "description": "Which side of which market to optimize.",
-                        },
-                    },
-                    "required": ["game_id", "market_side"],
+            required=["game_id", "market_side"],
+        ),
+        function_tool(
+            "scan_cross_book_arbitrage",
+            (
+                "Find theoretical two-way arbitrage: for each outcome, take the best (lowest implied "
+                "prob) price across sportsbooks. If those implieds sum to under 1.0, list the opportunity. "
+                "Supports moneyline; totals and spreads only when the line/pair matches within the game. "
+                "Omit game_id to scan all games in the sample."
+            ),
+            properties={
+                "game_id": {
+                    "type": "string",
+                    "description": "Optional. e.g. nba_20260320_lal_bos. Leave empty to scan entire slate.",
+                },
+                "include_markets": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["moneyline", "total", "spread"]},
+                    "description": "Defaults to all three if omitted or empty.",
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scan_cross_book_arbitrage",
-                "description": (
-                    "Find theoretical two-way arbitrage: for each outcome, take the best (lowest implied "
-                    "prob) price across sportsbooks. If those implieds sum to under 1.0, list the opportunity. "
-                    "Supports moneyline; totals and spreads only when the line/pair matches within the game. "
-                    "Omit game_id to scan all games in the sample."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "game_id": {
-                            "type": "string",
-                            "description": "Optional. e.g. nba_20260320_lal_bos. Leave empty to scan entire slate.",
-                        },
-                        "include_markets": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": ["moneyline", "total", "spread"],
-                            },
-                            "description": "Defaults to all three if omitted or empty.",
-                        },
-                    },
-                },
+        ),
+        function_tool(
+            "american_to_implied",
+            "Convert one American odds price to implied probability (decimal 0–1).",
+            properties={"american": {"type": "integer"}},
+            required=["american"],
+        ),
+        function_tool(
+            "compute_two_sided_market",
+            "Implied probs, vig, and fair (no-vig) probabilities for both sides of a market.",
+            properties={
+                "odds_side_a": {"type": "integer"},
+                "odds_side_b": {"type": "integer"},
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "american_to_implied",
-                "description": "Convert one American odds price to implied probability (decimal 0–1).",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"american": {"type": "integer"}},
-                    "required": ["american"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "compute_two_sided_market",
-                "description": "Implied probs, vig, and fair (no-vig) probabilities for both sides of a market.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "odds_side_a": {"type": "integer"},
-                        "odds_side_b": {"type": "integer"},
-                    },
-                    "required": ["odds_side_a", "odds_side_b"],
-                },
-            },
-        },
+            required=["odds_side_a", "odds_side_b"],
+        ),
     ]
     if include_sql:
         tools.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_readonly_sql",
-                    "description": (
-                        "Run a single SELECT against Postgres. Tables: odds_snapshots(id, label, loaded_at); "
-                        "odds_lines(id, snapshot_id, game_id, sport, home_team, away_team, commence_time, "
-                        "sportsbook, markets jsonb, last_updated). Use snapshot label 'default' or join on latest."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "sql": {
-                                "type": "string",
-                                "description": "Single SELECT only; no semicolons; no write DDL/DML.",
-                            }
-                        },
-                        "required": ["sql"],
-                    },
+            function_tool(
+                "run_readonly_sql",
+                (
+                    "Run a single SELECT against Postgres. Tables: odds_snapshots(id, label, loaded_at); "
+                    "odds_lines(id, snapshot_id, game_id, sport, home_team, away_team, commence_time, "
+                    "sportsbook, markets jsonb, last_updated). Use snapshot label 'default' or join on latest."
+                ),
+                properties={
+                    "sql": {
+                        "type": "string",
+                        "description": "Single SELECT only; no semicolons; no write DDL/DML.",
+                    }
                 },
-            }
+                required=["sql"],
+            )
         )
     return tools
 
@@ -371,9 +270,13 @@ def run_agent(
     msgs = [dict(m) for m in messages]
     trace: list[dict[str, Any]] = []
 
-    for _ in range(MAX_TOOL_ITERATIONS):
+    for _ in range(max_tool_iterations()):
         kwargs = _chat_completion_kwargs(model, msgs, tool_defs)
-        resp = client.chat.completions.create(**kwargs)
+        try:
+            resp = client.chat.completions.create(**kwargs)
+        except Exception:
+            logger.exception("OpenAI completion failed")
+            raise
         msg = resp.choices[0].message
         tool_call_dicts = _tool_calls_from_api_message(msg)
 
@@ -453,13 +356,14 @@ def run_agent_stream(
     msgs: list[dict[str, Any]] = [dict(m) for m in messages]
     trace: list[dict[str, Any]] = []
 
-    for _ in range(MAX_TOOL_ITERATIONS):
+    for _ in range(max_tool_iterations()):
         kwargs = _chat_completion_kwargs(model, msgs, tool_defs)
         kwargs["stream"] = True
 
         try:
             stream = client.chat.completions.create(**kwargs)
         except Exception as e:
+            logger.exception("OpenAI streaming completion failed")
             yield {"event": "error", "message": str(e)}
             return
 
@@ -512,10 +416,3 @@ def run_agent_stream(
         "tool_trace": trace,
         "messages": msgs,
     }
-
-
-def parse_briefing_json(final_text: str) -> dict[str, Any] | None:
-    try:
-        return json.loads(final_text)
-    except json.JSONDecodeError:
-        return None

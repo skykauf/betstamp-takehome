@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,6 +29,10 @@ from services.sse import (
     iter_agent_sse_events,
 )
 from services.odds_seed import ensure_odds_seeded
+from services.openai_errors import (
+    raise_http_if_missing_openai_key,
+    sse_error_message,
+)
 from services.thread_store import create_thread, load_messages, save_messages
 
 ROOT = Path(__file__).resolve().parent
@@ -41,6 +46,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Runs on each serverless cold start (e.g. first site hit on Vercel): schema + idempotent seed.
+    if not os.environ.get("OPENAI_API_KEY", "").strip():
+        logger.warning(
+            "OPENAI_API_KEY is unset; /api/brief and /api/chat will error until configured."
+        )
     result = await asyncio.to_thread(ensure_odds_seeded)
     if result.get("status") == "error":
         logger.warning("ensure_odds_seeded: %s", result.get("error"))
@@ -93,8 +102,10 @@ def api_brief():
             "tool_trace": tool_trace,
         }
     except RuntimeError as e:
-        if "OPENAI_API_KEY" in str(e):
-            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise_http_if_missing_openai_key(e)
+        raise
+    except Exception:
+        logger.exception("api_brief failed")
         raise
 
 
@@ -116,10 +127,11 @@ def api_brief_stream():
             ):
                 yield line
         except RuntimeError as e:
-            yield format_sse_event({"event": "error", "message": str(e)})
+            yield format_sse_event({"event": "error", "message": sse_error_message(e)})
             return
         except Exception as e:
-            yield format_sse_event({"event": "error", "message": str(e)})
+            logger.exception("api_brief_stream failed")
+            yield format_sse_event({"event": "error", "message": sse_error_message(e)})
             return
 
         if outcome.final_messages is not None:
@@ -154,8 +166,10 @@ def api_chat(body: ChatBody):
         save_messages(body.thread_id, updated)
         return {"reply": final_text, "tool_trace": tool_trace}
     except RuntimeError as e:
-        if "OPENAI_API_KEY" in str(e):
-            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise_http_if_missing_openai_key(e)
+        raise
+    except Exception:
+        logger.exception("api_chat failed")
         raise
 
 
@@ -175,9 +189,10 @@ def api_chat_stream(body: ChatBody):
             ):
                 yield line
         except RuntimeError as e:
-            yield format_sse_event({"event": "error", "message": str(e)})
+            yield format_sse_event({"event": "error", "message": sse_error_message(e)})
         except Exception as e:
-            yield format_sse_event({"event": "error", "message": str(e)})
+            logger.exception("api_chat_stream failed")
+            yield format_sse_event({"event": "error", "message": sse_error_message(e)})
         finally:
             if outcome.final_messages is not None:
                 save_messages(body.thread_id, outcome.final_messages)

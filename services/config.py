@@ -17,6 +17,16 @@ def openai_model() -> str:
     return os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
 
 
+@lru_cache
+def max_tool_iterations() -> int:
+    raw = os.environ.get("MAX_TOOL_ITERATIONS", "24").strip()
+    try:
+        n = int(raw)
+        return max(1, min(n, 64))
+    except ValueError:
+        return 24
+
+
 def database_url() -> str | None:
     u = os.environ.get("DATABASE_URL", "").strip()
     return u or None

@@ -19,6 +19,22 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T03:00:00Z — Code quality pass (prompts file, validation, tests, errors)
+
+**What happened**
+
+- **Prompts:** `SYSTEM_PROMPT` / `BRIEFING_USER` moved to **`services/prompts/*.md`**, loaded at import.
+- **`services/briefing_schema.py`:** Pydantic **`BriefingPayload`** with `extra="allow"`; **`parse_briefing_json`** validates when possible, logs **`ValidationError`**, returns raw dict on soft-fail. Re-exported from **`services.agent`** for existing imports.
+- **`services/tool_schemas.function_tool`:** DRY OpenAI function definitions; **`agent._tool_definitions`** refactored.
+- **`services/openai_errors.py`:** **`raise_http_if_missing_openai_key`**, **`sse_error_message`** for consistent 503 / SSE errors.
+- **`config.max_tool_iterations()`** env **`MAX_TOOL_ITERATIONS`** (default 24, clamped 1–64).
+- **`app.py`:** Lifespan warns when **`OPENAI_API_KEY`** unset; **`logger.exception`** on unexpected handler errors; stream handlers log failures.
+- **`thread_store`:** Docstring clarifies in-memory vs Postgres / multi-instance.
+- **Tests:** **`tests/test_app.py`** (health, chat 404, mocked brief + brief stream + chat); **`tests/test_briefing_schema.py`**.
+- **Deps:** explicit **`pydantic`**, **`httpx`** (TestClient) in **`requirements.txt`**.
+
+---
+
 ## 2026-04-04T02:00:00Z — Refactor: shared SSE + tool loop + `app.js`
 
 **What happened**
@@ -305,3 +321,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 21. This works great. thanks for all your hard work. can we add some more example follow up questions? use the assignment pdf for inspiration `@Betstamp AI Odds Agent - Take Home - FINAL.pdf`
 
 22. yes lets prioritize the highest leverage for simplicity + safety is usually: one SSE helper + shared stream wrapper, then one agent loop behind stream/non-stream, then extract frontend JS for maintainability.
+
+23. can you go ahead and perform the rest of the code quality improvements you listed before. they all look helpful and sound

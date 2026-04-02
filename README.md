@@ -55,6 +55,7 @@ Copy `.env.example` to `.env` for local use. Never commit secrets.
 | `OPENAI_MODEL` | No | Default `gpt-4o-mini` |
 | `DATABASE_URL` | No | Supabase Postgres for `run_readonly_sql` tool |
 | `CORS_ORIGINS` | No | Comma-separated origins; default `*` for take-home |
+| `MAX_TOOL_ITERATIONS` | No | Cap on agent tool rounds per request (default **24**, max **64**) |
 
 ### Local run
 
@@ -94,7 +95,9 @@ python scripts/seed_odds.py
 - **`POST /api/chat/stream`** — Same JSON body as chat. **SSE** (`text/event-stream`): `data: {"event":"delta","text":"..."}` for final-assistant tokens, `{"event":"tool","name",...}` while tools run, then `{"event":"done","reply","tool_trace","messages"}`. The UI uses this by default.
 - **`POST /api/chat`** — Same body; returns `{ reply, tool_trace }` in one JSON response (handy for curl/scripts).
 
-Threads and messages are persisted when `DATABASE_URL` is set; otherwise the server keeps in-memory conversation state (fine for demos, not for multi-instance production).
+Threads and messages are persisted when `DATABASE_URL` is set. Without it, **`thread_store`** keeps threads in an in-process dict (**one Python process only** — not shared across Vercel instances). Use Postgres when you need durable or multi-instance chat. On startup, the app logs a **warning** if `OPENAI_API_KEY` is missing.
+
+System and briefing user prompts live under **`services/prompts/*.md`** (loaded at import). Briefing JSON is optionally validated with **Pydantic** (`services/briefing_schema.py`); invalid shapes still return the raw dict for the UI, with a log line.
 
 ## Project layout
 
@@ -107,7 +110,11 @@ templates/index.html
 templates/app.js
 pyproject.toml
 services/
+  prompts/             # system_prompt.md, briefing_user.md (agent instructions)
   config.py            # env settings
+  briefing_schema.py   # parse + soft-validate briefing JSON
+  openai_errors.py     # map missing API key → HTTP 503 / SSE errors
+  tool_schemas.py      # helper to build OpenAI function tool JSON
   math_odds.py         # implied prob, vig, no-vig
   odds_repository.py  # JSON + optional DB reads
   best_line.py          # cross-book best price per game side
@@ -126,6 +133,8 @@ supabase/migrations/001_init.sql
 pip install -r requirements.txt
 pytest tests/ -q
 ```
+
+`tests/test_app.py` exercises HTTP routes with **mocks** (no live OpenAI). `tests/test_briefing_schema.py` covers Pydantic validation fallbacks.
 
 ## Further reading
 
