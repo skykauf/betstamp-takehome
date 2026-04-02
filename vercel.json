@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
   "version": 2,
   "builds": [{ "src": "app.py", "use": "@vercel/python" }],
   "routes": [

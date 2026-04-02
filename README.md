@@ -81,10 +81,11 @@ python scripts/seed_odds.py
 
 ### Deploy (Vercel)
 
-1. Connect the GitHub repo to Vercel. This repo **includes `vercel.json`** on purpose: it uses legacy **`builds` + `routes`** so `app.py` is always registered as a Python function, and a **catch‑all** sends non-static traffic (e.g. `POST /api/brief`) to that function. **`handle: filesystem`** runs first so `GET /` is served from **`public/index.html`** on the CDN (fast) while API calls still hit FastAPI.
-2. In Vercel **Project → Settings → General**, leave **Output Directory** empty unless you know you need an override. A mistaken output directory can produce all-404 deployments.
-3. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) in Project → Settings → Environment Variables.
-4. Deploy. The first production request that cold-starts `app.py` initializes Postgres (if configured) and seeds odds; `GET /` should load `public/index.html`, `POST /api/brief` should return JSON.
+1. **Framework preset (Build & Deployment):** **Python** — as in the Vercel dashboard — is the right family: install is `pip install -r requirements.txt` and the runtime is Python. This repo also sets **`"framework": "fastapi"`** in `vercel.json` so Git deploys target the FastAPI builder when Vercel reads the file; if your UI lists a separate **FastAPI** preset, choosing it is equivalent and fine.
+2. Connect the GitHub repo. **`vercel.json`** adds legacy **`builds` + `routes`** so root **`app.py`** is always built with **`@vercel/python`**, and a **catch‑all** sends non-static traffic (e.g. `POST /api/brief`) to that function. **`handle: filesystem`** runs first so **`GET /`** can be served from **`public/index.html`** on the CDN while API calls still hit FastAPI.
+3. In **Project → Settings → General**, leave **Output Directory** empty (override off). A wrong output directory can yield all-404 deployments.
+4. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) under **Environment Variables**.
+5. Deploy. The first request that cold-starts `app.py` runs DB seed when configured; `GET /` should serve `public/index.html`, `POST /api/brief` JSON.
 
 ## API sketch
 

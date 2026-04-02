@@ -19,6 +19,15 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-03T01:00:00Z — Align `vercel.json` with Python / FastAPI framework preset
+
+**What happened**
+
+- Dashboard **Framework Preset → Python** matches this project (pip + Python runtime). Added **`"framework": "fastapi"`** to `vercel.json` so repo config matches Vercel’s FastAPI slug and stays consistent with Git-based deploys; **Python** vs **FastAPI** in the UI is the same stack here.
+- README deploy steps now spell out that relationship and the **`builds`/`routes`** routing layer on top.
+
+---
+
 ## 2026-04-03T00:30:00Z — Vercel: explicit `builds`/`routes` + `public/` again
 
 **What happened**
