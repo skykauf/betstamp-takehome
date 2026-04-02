@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,9 +18,15 @@ from services.agent import (
     SYSTEM_PROMPT,
     parse_briefing_json,
     run_agent,
-    run_agent_stream,
 )
 from services.config import cors_origins
+from services.sse import (
+    AgentStreamOutcome,
+    SSE_MEDIA_TYPE,
+    STREAMING_HEADERS,
+    format_sse_event,
+    iter_agent_sse_events,
+)
 from services.odds_seed import ensure_odds_seeded
 from services.thread_store import create_thread, load_messages, save_messages
 
@@ -103,42 +108,38 @@ def api_brief_stream():
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": BRIEFING_USER},
         ]
-        yield f"data: {json.dumps({'event': 'start', 'thread_id': tid})}\n\n"
-        final_messages: list | None = None
-        last_reply = ""
-        last_trace: list = []
+        outcome = AgentStreamOutcome()
+        yield format_sse_event({"event": "start", "thread_id": tid})
         try:
-            for evt in run_agent_stream(msgs):
-                if evt.get("event") == "done":
-                    final_messages = evt.get("messages")
-                    last_reply = evt.get("reply", "") or ""
-                    last_trace = evt.get("tool_trace") or []
-                    continue
-                yield f"data: {json.dumps(evt, default=str)}\n\n"
+            for line in iter_agent_sse_events(
+                msgs, forward_terminal_done=False, outcome=outcome
+            ):
+                yield line
         except RuntimeError as e:
-            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            yield format_sse_event({"event": "error", "message": str(e)})
             return
         except Exception as e:
-            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            yield format_sse_event({"event": "error", "message": str(e)})
             return
 
-        if final_messages is not None:
-            save_messages(tid, final_messages)
-            structured = parse_briefing_json(last_reply)
+        if outcome.final_messages is not None:
+            save_messages(tid, outcome.final_messages)
+            structured = parse_briefing_json(outcome.last_reply)
             briefing_payload = (
-                structured if structured is not None else {"raw_markdown": last_reply}
+                structured
+                if structured is not None
+                else {"raw_markdown": outcome.last_reply}
             )
-            yield f"data: {json.dumps({'event': 'brief_done', 'thread_id': tid, 'briefing': briefing_payload, 'tool_trace': last_trace}, default=str)}\n\n"
+            yield format_sse_event(
+                {
+                    "event": "brief_done",
+                    "thread_id": tid,
+                    "briefing": briefing_payload,
+                    "tool_trace": outcome.last_trace,
+                }
+            )
 
-    return StreamingResponse(
-        event_gen(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return StreamingResponse(event_gen(), media_type=SSE_MEDIA_TYPE, headers=STREAMING_HEADERS)
 
 
 @app.post("/api/chat")
@@ -167,29 +168,21 @@ def api_chat_stream(body: ChatBody):
     messages.append({"role": "user", "content": body.message})
 
     def event_gen():
-        final_msgs: list | None = None
+        outcome = AgentStreamOutcome()
         try:
-            for evt in run_agent_stream(messages):
-                if evt.get("event") == "done":
-                    final_msgs = evt.get("messages")
-                yield f"data: {json.dumps(evt, default=str)}\n\n"
+            for line in iter_agent_sse_events(
+                messages, forward_terminal_done=True, outcome=outcome
+            ):
+                yield line
         except RuntimeError as e:
-            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            yield format_sse_event({"event": "error", "message": str(e)})
         except Exception as e:
-            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+            yield format_sse_event({"event": "error", "message": str(e)})
         finally:
-            if final_msgs is not None:
-                save_messages(body.thread_id, final_msgs)
+            if outcome.final_messages is not None:
+                save_messages(body.thread_id, outcome.final_messages)
 
-    return StreamingResponse(
-        event_gen(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return StreamingResponse(event_gen(), media_type=SSE_MEDIA_TYPE, headers=STREAMING_HEADERS)
 
 
 if TEMPLATES.is_dir():

@@ -281,25 +281,81 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
     return {"error": f"unknown tool: {name}"}
 
 
-def _append_assistant_with_tools(msg: Any, out: list[dict[str, Any]]) -> None:
-    tc = msg.tool_calls or []
-    out.append(
+def _parse_tool_arguments(raw: str | None) -> dict[str, Any]:
+    try:
+        return json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+
+def _tool_calls_from_api_message(msg: Any) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": t.id,
+            "type": "function",
+            "function": {
+                "name": t.function.name,
+                "arguments": t.function.arguments or "{}",
+            },
+        }
+        for t in (msg.tool_calls or [])
+    ]
+
+
+def _chat_completion_kwargs(
+    model: str, msgs: list[dict[str, Any]], tools: list[dict[str, Any]]
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {"model": model, "messages": msgs}
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+    return kwargs
+
+
+def _run_tool_calls(
+    msgs: list[dict[str, Any]],
+    trace: list[dict[str, Any]],
+    assistant_content: str | None,
+    tool_call_dicts: list[dict[str, Any]],
+    *,
+    collect_tool_sse_events: bool,
+) -> list[dict[str, Any]]:
+    """Append assistant+tool messages; optionally collect ``tool`` SSE-shaped events."""
+    sse_tool_events: list[dict[str, Any]] = []
+    msgs.append(
         {
             "role": "assistant",
-            "content": msg.content,
-            "tool_calls": [
-                {
-                    "id": t.id,
-                    "type": "function",
-                    "function": {
-                        "name": t.function.name,
-                        "arguments": t.function.arguments or "{}",
-                    },
-                }
-                for t in tc
-            ],
+            "content": assistant_content if assistant_content else None,
+            "tool_calls": tool_call_dicts,
         }
     )
+    for tcd in tool_call_dicts:
+        name = tcd["function"]["name"]
+        args = _parse_tool_arguments(tcd["function"].get("arguments"))
+        if collect_tool_sse_events:
+            sse_tool_events.append({"event": "tool", "name": name, "arguments": args})
+        try:
+            result = _call_tool(name, args)
+        except Exception as e:
+            result = {"error": str(e)}
+        trace.append(
+            {"tool": name, "arguments": args, "ok": "error" not in result}
+        )
+        msgs.append(
+            {
+                "role": "tool",
+                "tool_call_id": tcd["id"],
+                "content": json.dumps(result, default=str),
+            }
+        )
+    return sse_tool_events
+
+
+def _max_iterations_payload() -> dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": '{"error":"max tool iterations exceeded"}',
+    }
 
 
 def run_agent(
@@ -311,61 +367,31 @@ def run_agent(
     client = OpenAI(api_key=openai_api_key())
     model = openai_model()
     include_sql = database.db_available()
-    tools = _tool_definitions(include_sql=include_sql)
+    tool_defs = _tool_definitions(include_sql=include_sql)
     msgs = [dict(m) for m in messages]
     trace: list[dict[str, Any]] = []
 
     for _ in range(MAX_TOOL_ITERATIONS):
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": msgs,
-        }
-        if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
-
+        kwargs = _chat_completion_kwargs(model, msgs, tool_defs)
         resp = client.chat.completions.create(**kwargs)
-        choice = resp.choices[0]
-        msg = choice.message
+        msg = resp.choices[0].message
+        tool_call_dicts = _tool_calls_from_api_message(msg)
 
-        if msg.tool_calls:
-            _append_assistant_with_tools(msg, msgs)
-            for tc in msg.tool_calls:
-                name = tc.function.name
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                try:
-                    result = _call_tool(name, args)
-                except Exception as e:
-                    result = {"error": str(e)}
-                trace.append(
-                    {
-                        "tool": name,
-                        "arguments": args,
-                        "ok": "error" not in result,
-                    }
-                )
-                msgs.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": json.dumps(result, default=str),
-                    }
-                )
+        if tool_call_dicts:
+            _run_tool_calls(
+                msgs,
+                trace,
+                msg.content,
+                tool_call_dicts,
+                collect_tool_sse_events=False,
+            )
             continue
 
         text = (msg.content or "").strip()
         msgs.append({"role": "assistant", "content": msg.content or ""})
         return msgs, text, trace
 
-    msgs.append(
-        {
-            "role": "assistant",
-            "content": '{"error":"max tool iterations exceeded"}',
-        }
-    )
+    msgs.append(_max_iterations_payload())
     return msgs, msgs[-1]["content"], trace
 
 
@@ -423,19 +449,13 @@ def run_agent_stream(
     client = OpenAI(api_key=openai_api_key())
     model = openai_model()
     include_sql = database.db_available()
-    tools = _tool_definitions(include_sql=include_sql)
+    tool_defs = _tool_definitions(include_sql=include_sql)
     msgs: list[dict[str, Any]] = [dict(m) for m in messages]
     trace: list[dict[str, Any]] = []
 
     for _ in range(MAX_TOOL_ITERATIONS):
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": msgs,
-            "stream": True,
-        }
-        if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
+        kwargs = _chat_completion_kwargs(model, msgs, tool_defs)
+        kwargs["stream"] = True
 
         try:
             stream = client.chat.completions.create(**kwargs)
@@ -445,15 +465,12 @@ def run_agent_stream(
 
         accum = _StreamToolAccumulator()
         content_parts: list[str] = []
-        finish_reason: str | None = None
         saw_tool_delta = False
 
         for chunk in stream:
             if not chunk.choices:
                 continue
             ch = chunk.choices[0]
-            if ch.finish_reason:
-                finish_reason = ch.finish_reason
             d = ch.delta
             if d is None:
                 continue
@@ -468,38 +485,14 @@ def run_agent_stream(
         tool_call_dicts = accum.as_api_tool_calls()
 
         if tool_call_dicts:
-            msgs.append(
-                {
-                    "role": "assistant",
-                    "content": full_content or None,
-                    "tool_calls": tool_call_dicts,
-                }
-            )
-            for tcd in tool_call_dicts:
-                name = tcd["function"]["name"]
-                try:
-                    args = json.loads(tcd["function"].get("arguments") or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                yield {"event": "tool", "name": name, "arguments": args}
-                try:
-                    result = _call_tool(name, args)
-                except Exception as e:
-                    result = {"error": str(e)}
-                trace.append(
-                    {
-                        "tool": name,
-                        "arguments": args,
-                        "ok": "error" not in result,
-                    }
-                )
-                msgs.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tcd["id"],
-                        "content": json.dumps(result, default=str),
-                    }
-                )
+            for ev in _run_tool_calls(
+                msgs,
+                trace,
+                full_content or None,
+                tool_call_dicts,
+                collect_tool_sse_events=True,
+            ):
+                yield ev
             continue
 
         msgs.append({"role": "assistant", "content": full_content or ""})
@@ -512,12 +505,7 @@ def run_agent_stream(
         }
         return
 
-    msgs.append(
-        {
-            "role": "assistant",
-            "content": '{"error":"max tool iterations exceeded"}',
-        }
-    )
+    msgs.append(_max_iterations_payload())
     yield {
         "event": "done",
         "reply": msgs[-1]["content"],

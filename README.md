@@ -18,7 +18,7 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
 | Structured briefing + book rankings | JSON sections (overview, anomalies, value, rankings); **confidence** + **confidence_basis** on each anomaly/value row (bonus); UI renders both. |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
-| Simple UI | `templates/index.html` — served by FastAPI (`GET /`); must be bundled with the app (not only `public/`). |
+| Simple UI | `templates/index.html` + `templates/app.js` (mounted at `/static/…`) — bundled with the app (not only `public/`). |
 | Development log | `DEVLOG.md` (required by evaluators). |
 
 ## Architecture
@@ -82,7 +82,7 @@ python scripts/seed_odds.py
 ### Deploy (Vercel)
 
 1. **Framework preset (Build & Deployment):** **Python** — as in the Vercel dashboard — is the right family: install is `pip install -r requirements.txt` and the runtime is Python. This repo also sets **`"framework": "fastapi"`** in `vercel.json` so Git deploys target the FastAPI builder when Vercel reads the file; if your UI lists a separate **FastAPI** preset, choosing it is equivalent and fine.
-2. Connect the GitHub repo. **`vercel.json`** uses legacy **`builds` + `routes`**: **`app.py`** is built with **`@vercel/python`**, and **`/(.*)` → `app.py`** sends **all** requests (including **`GET /`**) to FastAPI. The HTML UI lives in **`templates/index.html`** so it is included in the Python deployment bundle — files in **`public/`** are not available to `FileResponse` inside the function on Vercel.
+2. Connect the GitHub repo. **`vercel.json`** uses legacy **`builds` + `routes`**: **`app.py`** is built with **`@vercel/python`**, and **`/(.*)` → `app.py`** sends **all** requests (including **`GET /`**) to FastAPI. The UI lives under **`templates/`** (`index.html` + `app.js` served via **`/static/app.js`**) so it ships inside the Python bundle — files in **`public/`** are not available to `FileResponse` inside the function on Vercel.
 3. In **Project → Settings → General**, leave **Output Directory** empty (override off). A wrong output directory can yield all-404 deployments.
 4. Set `OPENAI_API_KEY` (and `DATABASE_URL` if using Supabase) under **Environment Variables**.
 5. Deploy. The first request that cold-starts `app.py` runs DB seed when configured; `GET /` should return the HTML UI from `templates/`, `POST /api/brief` JSON.
@@ -104,6 +104,7 @@ app.py                 # FastAPI entry (explicit Python build target)
 requirements.txt
 data/sample_odds_data.json
 templates/index.html
+templates/app.js
 pyproject.toml
 services/
   config.py            # env settings
@@ -114,6 +115,7 @@ services/
   odds_seed.py         # cold-start schema + idempotent seed
   database.py          # connection + safe SELECT helper
   agent.py             # tool loop + system prompt
+  sse.py               # SSE formatting + shared agent stream iterator
 scripts/seed_odds.py   # optional force re-seed from JSON
 supabase/migrations/001_init.sql
 ```

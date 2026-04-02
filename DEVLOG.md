@@ -19,6 +19,17 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T02:00:00Z — Refactor: shared SSE + tool loop + `app.js`
+
+**What happened**
+
+- **`services/sse.py`:** `format_sse_event`, `STREAMING_HEADERS`, `SSE_MEDIA_TYPE`, `AgentStreamOutcome`, and **`iter_agent_sse_events`** (forwards `run_agent_stream`, optionally suppresses terminal `done`, captures outcome).
+- **`app.py`:** `/api/chat/stream` and `/api/brief/stream` use the shared iterator + **`finally`** save; removed duplicate JSON/header strings; dropped unused `json` import.
+- **`services/agent.py`:** Shared **`_chat_completion_kwargs`**, **`_run_tool_calls`** (tool SSE events optional), **`_tool_calls_from_api_message`**, **`_parse_tool_arguments`**, **`_max_iterations_payload`** — **`run_agent`** and **`run_agent_stream`** both use the same tool-dispatch path.
+- **Frontend:** Logic moved to **`templates/app.js`** (IIFE); **`readFetchErrorBody`** dedupes stream error parsing; **`index.html`** loads **`/static/app.js`**.
+
+---
+
 ## 2026-04-04T01:00:00Z — More demo follow-up prompts (PDF-aligned)
 
 **What happened**
@@ -292,3 +303,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 20. Yes that sounds nice `/api/brief/stream` + a small briefing "activity" panel so tool calls are visible during the initial run too.
 
 21. This works great. thanks for all your hard work. can we add some more example follow up questions? use the assignment pdf for inspiration `@Betstamp AI Odds Agent - Take Home - FINAL.pdf`
+
+22. yes lets prioritize the highest leverage for simplicity + safety is usually: one SSE helper + shared stream wrapper, then one agent loop behind stream/non-stream, then extract frontend JS for maintainability.
