@@ -103,12 +103,19 @@
 
   <section>
     <h2 style="font-size:1rem;">Follow-up</h2>
-    <p class="muted" style="margin:0 0 0.25rem;">Example questions (uses your briefing thread):</p>
+    <p class="muted" style="margin:0 0 0.25rem;">Example questions (inspired by the take-home brief — uses your briefing thread):</p>
     <ul class="demo-prompts" id="demo-prompts">
-      <li><button type="button" class="demo-q" data-q="Which games or sportsbooks have the stalest last_updated timestamps compared to the rest of the slate?" disabled>Show me stale lines — who is oldest vs the field?</button></li>
-      <li><button type="button" class="demo-q" data-q="For game nba_20260320_lal_bos, what is the best moneyline price for the away team (Lakers) across all books, and what implied probability does that imply?" disabled>Best Lakers moneyline across books (with math)</button></li>
-      <li><button type="button" class="demo-q" data-q="Scan the full slate with scan_cross_book_arbitrage. Are there any strict two-way arbitrage opportunities? If so, summarize each; if none, say so." disabled>Any cross-book arbitrage on the full slate?</button></li>
-      <li><button type="button" class="demo-q" data-q="Call list_last_updated_for_staleness_check and tell me the single oldest last_updated row and how far it lags behind the newest." disabled>Quantify oldest vs newest last_updated</button></li>
+      <li><button type="button" class="demo-q" data-q="Which games or sportsbooks have the stalest last_updated timestamps compared to the rest of the slate?" disabled>Stale lines — who is oldest vs the field?</button></li>
+      <li><button type="button" class="demo-q" data-q="Why might the Knicks game (game_id nba_20260320_gsw_nyk, Warriors at Knicks) deserve extra scrutiny? Use tools to check staleness, outliers vs other books, and vig — cite specifics." disabled>Why flag the Knicks game? (brief-style)</button></li>
+      <li><button type="button" class="demo-q" data-q="Which sportsbooks on this slate would you tell an analyst to distrust or double-check tonight, and why? Ground the answer in tools (stale timestamps, wide margins, or off-market prices)." disabled>Which books should I avoid tonight?</button></li>
+      <li><button type="button" class="demo-q" data-q="Find one clear price outlier: a single book offering a spread, moneyline, or total that looks way off the consensus for its game. Use get_odds_for_game and math tools; quantify how far off it is in implied probability." disabled>Spot an outlier vs consensus</button></li>
+      <li><button type="button" class="demo-q" data-q="For game nba_20260320_lal_bos, what is the best moneyline price for the away team (Lakers) across all books, and what implied probability does that imply? Show the formula." disabled>Best Lakers moneyline (with math)</button></li>
+      <li><button type="button" class="demo-q" data-q="For game nba_20260320_mia_phi, compare moneyline vig at DraftKings vs FanDuel: use tools plus compute_two_sided_market or american_to_implied — report implied probs, sum, and vig for each book." disabled>Compare ML vig: DraftKings vs FanDuel</button></li>
+      <li><button type="button" class="demo-q" data-q="Pick one game and one market (spread or total). Explain no-vig fair probabilities for both sides using the tightest-looking two-way prices you can find in the data — normalize so the fair probs sum to 100% and show the math." disabled>No-vig fair % on a two-way market</button></li>
+      <li><button type="button" class="demo-q" data-q="Where is the best value on the board tonight in this sample — one concrete side (game_id + market + team/over-under) with the best price vs the next-best book? Use best_line_for_market and cite numbers." disabled>Best value vs next-best book</button></li>
+      <li><button type="button" class="demo-q" data-q="Scan the full slate with scan_cross_book_arbitrage. Are there any strict two-way arbitrage opportunities? If so, summarize each; if none, say so." disabled>Cross-book arbitrage on full slate?</button></li>
+      <li><button type="button" class="demo-q" data-q="Call list_last_updated_for_staleness_check and tell me the single oldest last_updated row and how far it lags behind the newest (in hours or minutes if you can derive it from the ISO timestamps)." disabled>Oldest vs newest last_updated</button></li>
+      <li><button type="button" class="demo-q" data-q="How did you justify the sportsbook quality rankings in the briefing? Pick two books — one you ranked high and one low — and re-check their lines on one shared game with tools to show what you mean." disabled>Sanity-check book rankings with data</button></li>
     </ul>
     <textarea id="chat-input" placeholder="Ask about the briefing…" disabled></textarea>
     <p><button type="button" id="send-chat" disabled>Send</button></p>
