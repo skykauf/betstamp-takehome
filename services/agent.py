@@ -9,7 +9,16 @@ from typing import Any, Iterator
 
 from openai import OpenAI
 
-from services import arbitrage, best_line, book_tightness, consensus_outlier, database, math_odds, odds_repository
+from services import (
+    arbitrage,
+    best_line,
+    book_tightness,
+    consensus_outlier,
+    database,
+    math_odds,
+    odds_repository,
+    stake_weights,
+)
 from services.briefing_schema import parse_briefing_json
 from services.config import max_tool_iterations, openai_api_key, openai_model
 from services.tool_schemas import function_tool
@@ -138,6 +147,33 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
             },
             required=["odds_side_a", "odds_side_b"],
         ),
+        function_tool(
+            "build_stake_weights",
+            (
+                "For a two-way market, compute stake fractions (and optional dollar amounts) that "
+                "equalize total return whether side A or B wins — standard arbitrage stake sizing from "
+                "decimal odds. Reports implied-probability sum, whether the pair is strict arb "
+                "(sum < 1), and ROI if you split stakes that way. Does not account for limits, fees, "
+                "or line movement."
+            ),
+            properties={
+                "odds_side_a": {
+                    "type": "integer",
+                    "description": "American odds for the first outcome/leg.",
+                },
+                "odds_side_b": {
+                    "type": "integer",
+                    "description": "American odds for the second outcome/leg.",
+                },
+                "total_stake": {
+                    "type": "number",
+                    "description": (
+                        "Optional total dollars to split across both legs. Omit for fractions only."
+                    ),
+                },
+            },
+            required=["odds_side_a", "odds_side_b"],
+        ),
     ]
     if include_sql:
         tools.append(
@@ -207,6 +243,17 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
     if name == "compute_two_sided_market":
         return math_odds.two_sided_market(
             int(arguments["odds_side_a"]), int(arguments["odds_side_b"])
+        )
+    if name == "build_stake_weights":
+        ts = arguments.get("total_stake")
+        if ts is None:
+            total = None
+        else:
+            total = float(ts)
+        return stake_weights.build_stake_weights(
+            int(arguments["odds_side_a"]),
+            int(arguments["odds_side_b"]),
+            total_stake=total,
         )
     if name == "run_readonly_sql":
         rows = database.run_readonly_sql(arguments["sql"])

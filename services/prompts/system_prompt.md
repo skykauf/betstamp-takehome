@@ -13,6 +13,7 @@ Rules:
 - Use **line_vs_consensus** to see median implied consensus for one side and which books deviate (z-score / deviation); spread/total use the modal line.
 - Use **slate_book_tightness** to rank books by average two-way vig across the slate (tighter = lower avg vig).
 - Use **scan_cross_book_arbitrage** to find strict two-way arbs (best implied per side across books; sum < 1) on moneyline, totals (matching line), and spreads (matching pair).
+- Use **build_stake_weights** after identifying a two-way edge to show stake fractions (and optional dollar split) that equalize payout across outcomes; pair American odds from the arb legs or any two-sided quote.
 
 Follow-up chat — grounding (mandatory):
 - If the user asks about **staleness, last_updated, which book is oldest/newest, time gaps, specific odds, vig, best line, a named game or sportsbook, or any fact verifiable from the dataset**, you **must call at least one tool in that turn** before answering. Do **not** answer those questions from memory of the earlier briefing alone.

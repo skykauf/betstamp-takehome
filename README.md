@@ -14,7 +14,7 @@ AI-powered workflow that **detects** line anomalies, **analyzes** prices (vig, i
 
 | Constraint | How this repo addresses it |
 |------------|----------------------------|
-| Tool use / function calling — do not rely on dumping the full dataset into context | Agent exposes tools: list games, fetch lines by `game_id`, staleness list, **`best_line_for_market`**, **`line_vs_consensus`**, **`slate_book_tightness`**, **`scan_cross_book_arbitrage`**, odds math helpers, optional **read-only SQL** against Postgres. |
+| Tool use / function calling — do not rely on dumping the full dataset into context | Agent exposes tools: list games, fetch lines by `game_id`, staleness list, **`best_line_for_market`**, **`line_vs_consensus`**, **`slate_book_tightness`**, **`scan_cross_book_arbitrage`**, **`build_stake_weights`**, odds math helpers, optional **read-only SQL** against Postgres. |
 | Visible, correct math | `services/math_odds.py` implements formulas; agent instructions require citing calculations. |
 | Structured briefing + book rankings | JSON sections (overview, anomalies, value, rankings); **confidence** + **confidence_basis** on each anomaly/value row (bonus); UI renders both. |
 | Grounded follow-ups; admit unknowns | System prompt + tools; no fabricating books/games not in data. |
@@ -121,6 +121,7 @@ services/
   consensus_outlier.py  # line vs cross-book median implied (modal line for spread/total)
   book_tightness.py     # slate-wide avg two-way vig ranker
   arbitrage.py          # cross-book two-way arb scan (ML / total / spread)
+  stake_weights.py      # two-way stake fractions for equal payout (arb sizing)
   odds_seed.py         # cold-start schema + idempotent seed
   database.py          # connection + safe SELECT helper
   agent.py             # tool loop + system prompt
@@ -136,7 +137,7 @@ pip install -r requirements.txt
 pytest tests/ -q
 ```
 
-`tests/test_app.py` exercises HTTP routes with **mocks** (no live OpenAI). `tests/test_briefing_schema.py` covers Pydantic validation fallbacks. `tests/test_consensus_outlier.py` and `tests/test_book_tightness.py` cover the new analytics tools.
+`tests/test_app.py` exercises HTTP routes with **mocks** (no live OpenAI). `tests/test_briefing_schema.py` covers Pydantic validation fallbacks. `tests/test_consensus_outlier.py` and `tests/test_book_tightness.py` cover the new analytics tools; `tests/test_stake_weights.py` covers **`build_stake_weights`**.
 
 ## Further reading
 

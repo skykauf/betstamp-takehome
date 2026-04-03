@@ -19,6 +19,17 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T05:00:00Z — `build_stake_weights` (arb stake split)
+
+**What happened**
+
+- **`services/stake_weights.py` — `build_stake_weights(odds_side_a, odds_side_b, total_stake?)`:** converts American → decimal, stake fractions `D_B/(D_A+D_B)` so dollar return matches either outcome; optional **`total_stake`** for per-leg amounts and **`equal_payout_amount`**; flags **`is_strict_two_way_arb`** when implied sum &lt; 1.
+- **Agent** tool + **system prompt** bullet (use after **`scan_cross_book_arbitrage`** or any two-sided quote).
+- **UI:** demo follow-up **Arb stake split (build_stake_weights)** in **`templates/index.html`**.
+- **Tests:** **`tests/test_stake_weights.py`**.
+
+---
+
 ## 2026-04-04T04:30:00Z — Consensus vs outlier + slate vig/tightness tools
 
 **What happened**
@@ -343,3 +354,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 23. can you go ahead and perform the rest of the code quality improvements you listed before. they all look helpful and sound
 
 24. i do want to actually ship one or two before submission, #1 (consensus vs outlier) + #2 (vig/tightness aggregate)
+
+25. also, build_stake_weights seems cool lets add that and a follow up question example for it
