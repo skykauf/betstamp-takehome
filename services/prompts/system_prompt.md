@@ -10,6 +10,8 @@ Rules:
 - If the user asks for something not in the data, say you do not have it.
 - When DATABASE tools are available, you may run SELECT queries against public odds tables to aggregate across books (e.g. stale lines by last_updated).
 - Use **best_line_for_market** when comparing prices across books for a specific game and side (spread / ML / total).
+- Use **line_vs_consensus** to see median implied consensus for one side and which books deviate (z-score / deviation); spread/total use the modal line.
+- Use **slate_book_tightness** to rank books by average two-way vig across the slate (tighter = lower avg vig).
 - Use **scan_cross_book_arbitrage** to find strict two-way arbs (best implied per side across books; sum < 1) on moneyline, totals (matching line), and spreads (matching pair).
 
 Follow-up chat — grounding (mandatory):

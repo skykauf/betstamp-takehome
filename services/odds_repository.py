@@ -46,6 +46,11 @@ def get_odds_for_game(game_id: str) -> list[dict]:
     return [r for r in _payload()["odds"] if r["game_id"] == game_id]
 
 
+def all_odds_rows() -> list[dict]:
+    """All per-book rows in the loaded sample (for slate-wide aggregates)."""
+    return list(_payload().get("odds", []))
+
+
 def all_last_updated_times() -> list[tuple[str, str, str]]:
     """(game_id, sportsbook, last_updated iso) for staleness scans."""
     out = []

@@ -19,6 +19,24 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T04:30:00Z — Consensus vs outlier + slate vig/tightness tools
+
+**What happened**
+
+- **`services/consensus_outlier.py` — `line_vs_consensus(game_id, market_side)`:** cohort implied median/mean, per-book deviation and z-score vs cohort; moneyline uses all books; spread/total use the **modal** line (two decimals) then compare implieds on that line.
+- **`services/book_tightness.py` — `slate_book_tightness()`:** per odds row, average two-way vig where ML/spread/total pairs exist; aggregate mean/median/min/max per book and **`books_ranked_tightest_first`**.
+- **`services/odds_repository.py`:** **`all_odds_rows()`** for slate-wide scans without reaching into private loader state.
+- **`services/best_line.py`:** **`american_line_for_side`** exposed (was private helper) for reuse.
+- **Agent:** tools **`line_vs_consensus`** and **`slate_book_tightness`** wired in **`services/agent.py`**.
+- **Prompts:** system + briefing user nudge the model to use these for outlier stories and quantitative book rankings.
+- **Tests:** **`tests/test_consensus_outlier.py`**, **`tests/test_book_tightness.py`**.
+
+**Decisions**
+
+- Modal line for spread/total keeps the cohort apples-to-apples without averaging across different handicaps.
+
+---
+
 ## 2026-04-04T03:00:00Z — Code quality pass (prompts file, validation, tests, errors)
 
 **What happened**
@@ -323,3 +341,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 22. yes lets prioritize the highest leverage for simplicity + safety is usually: one SSE helper + shared stream wrapper, then one agent loop behind stream/non-stream, then extract frontend JS for maintainability.
 
 23. can you go ahead and perform the rest of the code quality improvements you listed before. they all look helpful and sound
+
+24. i do want to actually ship one or two before submission, #1 (consensus vs outlier) + #2 (vig/tightness aggregate)

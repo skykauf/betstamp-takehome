@@ -28,9 +28,11 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 4. **Follow-up chat** grounded in data; data-grounded questions (books, times, odds, best line, vig) require **tool calls** in that turn — see `services/agent.py` system prompt.
 5. **Epistemic honesty**: if data is missing or the question is out of scope, say so — **do not guess**.
 6. **`best_line_for_market`:** cross-book best price for one side = lowest implied probability (`services/best_line.py`).
-7. **`scan_cross_book_arbitrage`:** scan slate or one game for strict two-way arbs — best implied per side across books; totals/spreads only when line/pair matches (`services/arbitrage.py`).
-8. **Briefing JSON — confidence (bonus):** each **anomaly** and **value_opportunity** includes `confidence` (`high` | `medium` | `low`) and `confidence_basis` tied to tool evidence; optional fields on market overview and sportsbook rows (`services/briefing_schema.py` + UI in `templates/index.html`).
-9. **Prompts:** agent system + briefing user messages are **`services/prompts/system_prompt.md`** and **`briefing_user.md`** (not hard-coded in Python).
+7. **`line_vs_consensus`:** median/mean implied consensus vs per-book deviation for one game/side; spread/total cohorts use the modal line (`services/consensus_outlier.py`).
+8. **`slate_book_tightness`:** rank books by mean two-way vig across the slate (`services/book_tightness.py`).
+9. **`scan_cross_book_arbitrage`:** scan slate or one game for strict two-way arbs — best implied per side across books; totals/spreads only when line/pair matches (`services/arbitrage.py`).
+10. **Briefing JSON — confidence (bonus):** each **anomaly** and **value_opportunity** includes `confidence` (`high` | `medium` | `low`) and `confidence_basis` tied to tool evidence; optional fields on market overview and sportsbook rows (`services/briefing_schema.py` + UI in `templates/index.html`).
+11. **Prompts:** agent system + briefing user messages are **`services/prompts/system_prompt.md`** and **`briefing_user.md`** (not hard-coded in Python).
 
 ## UI expectations (simple is fine)
 

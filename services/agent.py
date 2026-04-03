@@ -9,7 +9,7 @@ from typing import Any, Iterator
 
 from openai import OpenAI
 
-from services import arbitrage, best_line, database, math_odds, odds_repository
+from services import arbitrage, best_line, book_tightness, consensus_outlier, database, math_odds, odds_repository
 from services.briefing_schema import parse_briefing_json
 from services.config import max_tool_iterations, openai_api_key, openai_model
 from services.tool_schemas import function_tool
@@ -70,6 +70,38 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
                 },
             },
             required=["game_id", "market_side"],
+        ),
+        function_tool(
+            "line_vs_consensus",
+            (
+                "For one game and market side, compare each book to cross-book consensus: median implied "
+                "probability, per-book deviation, and z-score vs cohort. Spread/total use the modal posted "
+                "line so prices are comparable. Use to flag off-market outliers."
+            ),
+            properties={
+                "game_id": {"type": "string", "description": "e.g. nba_20260320_lal_bos"},
+                "market_side": {
+                    "type": "string",
+                    "enum": [
+                        "spread_home",
+                        "spread_away",
+                        "moneyline_home",
+                        "moneyline_away",
+                        "total_over",
+                        "total_under",
+                    ],
+                    "description": "Same values as best_line_for_market.",
+                },
+            },
+            required=["game_id", "market_side"],
+        ),
+        function_tool(
+            "slate_book_tightness",
+            (
+                "Rank sportsbooks by average two-way vig (percent) across the sample: for each book×game "
+                "row, average vig on ML, spread, and total where both sides exist; then mean across games. "
+                "Lower avg_vig_percent ≈ tighter books on this snapshot."
+            ),
         ),
         function_tool(
             "scan_cross_book_arbitrage",
@@ -151,6 +183,13 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
             str(arguments["game_id"]),
             str(arguments["market_side"]),
         )
+    if name == "line_vs_consensus":
+        return consensus_outlier.line_vs_consensus(
+            str(arguments["game_id"]),
+            str(arguments["market_side"]),
+        )
+    if name == "slate_book_tightness":
+        return book_tightness.slate_book_tightness()
     if name == "scan_cross_book_arbitrage":
         gid = arguments.get("game_id")
         if isinstance(gid, str) and gid.strip() == "":

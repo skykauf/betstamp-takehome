@@ -20,8 +20,8 @@ VALID_SIDES = frozenset(
 )
 
 
-def _pick_american_and_line(markets: dict[str, Any], market_side: str) -> tuple[int | None, float | None]:
-    """Return (american_odds, display_line or None)."""
+def american_line_for_side(markets: dict[str, Any], market_side: str) -> tuple[int | None, float | None]:
+    """Return (American odds, display line or None) for one side of a market."""
     sp = markets.get("spread") or {}
     ml = markets.get("moneyline") or {}
     tot = markets.get("total") or {}
@@ -59,7 +59,7 @@ def best_line_for_side(game_id: str, market_side: str) -> dict[str, Any]:
     for r in rows:
         book = r["sportsbook"]
         markets = r.get("markets") or {}
-        american, line = _pick_american_and_line(markets, market_side)
+        american, line = american_line_for_side(markets, market_side)
         if american is None or american == 0:
             continue
         try:
