@@ -21,6 +21,15 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T07:00:00Z — `build_stake_weights` uses best cross-book prices per game
+
+**What happened**
+
+- **`build_stake_weights`** tool: optional **`game_id` + `two_way_market`** (`moneyline` | `spread` | `total`) resolves **best American on each side** (modal line/pair for spread/total); explicit **`odds_side_a`/`b`** kept for hypotheticals. **`build_stake_weights_for_game`** in **`services/stake_weights.py`**.
+- Prompts, **`AGENTS.md`**, demo follow-up, **`README`** aligned.
+
+---
+
 ## 2026-04-04T06:00:00Z — README + wireframes trim; `DEVLOG_FINAL_SUMMARY.md`
 
 **What happened**
@@ -371,3 +380,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 25. also, build_stake_weights seems cool lets add that and a follow up question example for it
 
 26. Amazing! as a last final edit before project completion, can you review the repo and update the README and any other docs? also, can we extract DEVLOG_FINAL_SUMMARY.md from devlog which is shorter and easier to review -- no required structure just do what you think is valuable for tracing the dev process remember, less is more
+
+27. build stake weights should be used with the best odds available for a given game

@@ -37,3 +37,23 @@ def test_total_stake_amounts_sum():
 def test_invalid_total_stake():
     out = stake_weights.build_stake_weights(-110, -110, total_stake=0)
     assert "error" in out
+
+
+def test_build_stake_weights_for_game_moneyline_uses_best_lines():
+    out = stake_weights.build_stake_weights_for_game(
+        "nba_20260320_lal_bos", "moneyline"
+    )
+    assert "error" not in out
+    assert out.get("pricing_basis") == "best_cross_book_per_side"
+    assert out["game_id"] == "nba_20260320_lal_bos"
+    assert out["two_way_market"] == "moneyline"
+    assert "side_a_leg" in out and "side_b_leg" in out
+    assert out["odds_side_a"] == out["side_a_leg"]["american"]
+    assert out["odds_side_b"] == out["side_b_leg"]["american"]
+
+
+def test_build_stake_weights_for_game_bad_market():
+    out = stake_weights.build_stake_weights_for_game(
+        "nba_20260320_lal_bos", "props"
+    )
+    assert "error" in out

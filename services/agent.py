@@ -150,20 +150,30 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
         function_tool(
             "build_stake_weights",
             (
-                "For a two-way market, compute stake fractions (and optional dollar amounts) that "
-                "equalize total return whether side A or B wins — standard arbitrage stake sizing from "
-                "decimal odds. Reports implied-probability sum, whether the pair is strict arb "
-                "(sum < 1), and ROI if you split stakes that way. Does not account for limits, fees, "
-                "or line movement."
+                "Equalize payout across a two-way market (stake fractions from decimal odds). "
+                "**Preferred for real games:** game_id + two_way_market (moneyline | spread | total) — "
+                "uses the **best American price on each side** across sportsbooks (lowest implied; modal "
+                "line or spread pair for total/spread). **Alternative:** odds_side_a + odds_side_b for "
+                "explicit Americans (e.g. hypothetical). Reports implied sum, strict-arb flag, optional "
+                "dollar split. Ignores limits, fees, line movement."
             ),
             properties={
+                "game_id": {
+                    "type": "string",
+                    "description": "With two_way_market, the game to price (e.g. nba_20260320_lal_bos).",
+                },
+                "two_way_market": {
+                    "type": "string",
+                    "enum": ["moneyline", "spread", "total"],
+                    "description": "With game_id, which market: best home+away ML, or modal spread/total.",
+                },
                 "odds_side_a": {
                     "type": "integer",
-                    "description": "American odds for the first outcome/leg.",
+                    "description": "Explicit American odds for leg A (use with odds_side_b if no game_id).",
                 },
                 "odds_side_b": {
                     "type": "integer",
-                    "description": "American odds for the second outcome/leg.",
+                    "description": "Explicit American odds for leg B.",
                 },
                 "total_stake": {
                     "type": "number",
@@ -172,7 +182,6 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
                     ),
                 },
             },
-            required=["odds_side_a", "odds_side_b"],
         ),
     ]
     if include_sql:
@@ -246,15 +255,26 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
         )
     if name == "build_stake_weights":
         ts = arguments.get("total_stake")
-        if ts is None:
-            total = None
-        else:
-            total = float(ts)
-        return stake_weights.build_stake_weights(
-            int(arguments["odds_side_a"]),
-            int(arguments["odds_side_b"]),
-            total_stake=total,
-        )
+        total = None if ts is None else float(ts)
+        gid = arguments.get("game_id")
+        twm = arguments.get("two_way_market")
+        if isinstance(gid, str) and gid.strip() and twm and str(twm).strip():
+            return stake_weights.build_stake_weights_for_game(
+                gid.strip(),
+                str(twm).strip(),
+                total_stake=total,
+            )
+        oa, ob = arguments.get("odds_side_a"), arguments.get("odds_side_b")
+        if oa is not None and ob is not None:
+            return stake_weights.build_stake_weights(
+                int(oa), int(ob), total_stake=total
+            )
+        return {
+            "error": (
+                "Provide game_id + two_way_market (moneyline|spread|total) for best-line sizing, "
+                "or odds_side_a + odds_side_b for explicit American prices."
+            )
+        }
     if name == "run_readonly_sql":
         rows = database.run_readonly_sql(arguments["sql"])
         truncated = len(rows) > SQL_ROW_CAP

@@ -12,7 +12,7 @@ Short companion to **`DEVLOG.md`**, which stays the **full** log (session notes 
 
 **Quality** — Prompts moved to **`services/prompts/*.md`**; Pydantic **soft-validate** briefing; capped tool iterations; clearer errors when the API key is missing.
 
-**Late additions** — `line_vs_consensus`, `slate_book_tightness`, `build_stake_weights` for consensus/outlier stories, book tightness ranking, and arb-style stake splits.
+**Late additions** — `line_vs_consensus`, `slate_book_tightness`, `build_stake_weights` (best cross-book price per side via `game_id` + market) for consensus/outlier stories, book tightness, and stake splits.
 
 ## Decisions that stuck
 
