@@ -1,6 +1,6 @@
 # App wireframes — Odds Agent (sample data)
 
-Low-fidelity layout and flows for a **single-page** experience: generate a briefing from the sample dataset, show **reasoning** (tools / sources), then **chat** grounded in the same data. UI polish is intentionally minimal per the brief.
+Low-fidelity layout and flows for a **single-page** experience: generate a briefing from the sample dataset, show **reasoning** (tools / sources), then **chat** grounded in the same data. Implemented UI: **`templates/index.html`** + **`templates/app.js`**; the briefing can stream via **`/api/brief/stream`** with a live tool-activity strip. Polish stays minimal per the brief.
 
 **Dataset:** `data/sample_odds_data.json` (optional Postgres mirror via `run_readonly_sql` when `DATABASE_URL` is set)
 
@@ -19,7 +19,7 @@ Each element of `odds[]` is one **game × sportsbook** row:
 | `markets.total` | `line`, `over_odds`, `under_odds` |
 | `last_updated` | Staleness / anomaly callouts |
 
-**Derived units (not in JSON, computed via tools):** implied probability per side, vig, no-vig fair %, best line across the 8 books, flags (stale, outlier, arb hints).
+**Derived (via tools):** implieds, vig, fair %, best line, staleness, consensus vs median (`line_vs_consensus`), book tightness rank (`slate_book_tightness`), arb scan, stake weights for two-way splits.
 
 ---
 

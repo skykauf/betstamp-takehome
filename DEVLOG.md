@@ -2,6 +2,8 @@
 
 This file is a **required deliverable** for the take-home. Reviewers weight it (~20%) alongside code: how AI tools were used, prompt iteration, trade-offs, and what we would improve with more time.
 
+For a **short narrative** of the same arc (no session-level detail), see **`DEVLOG_FINAL_SUMMARY.md`**.
+
 ---
 
 ## How to use this log
@@ -16,6 +18,17 @@ Add entries as you build. Each substantive session should touch at least one of:
 2. **Agent prompt / tool design** — How did the system prompt or tool schemas evolve? What did you try that failed?
 3. **Key decisions** — LLM choice, stack, architecture — and **why**.
 4. **Improvements backlog** — Specific next steps if you had another week.
+
+---
+
+## 2026-04-04T06:00:00Z — README + wireframes trim; `DEVLOG_FINAL_SUMMARY.md`
+
+**What happened**
+
+- **`README.md`:** tighter quick start, env table, short architecture/deploy/testing, compact repo map; links **`DEVLOG_FINAL_SUMMARY.md`**.
+- **`DEVLOG_FINAL_SUMMARY.md`:** one-page narrative of build arc (full detail stays in **`DEVLOG.md`**).
+- **`AGENTS.md`:** optional pointer to summary; bonus section deduped.
+- **`docs/wireframes.md`:** implementation paths + current tool-derived metrics.
 
 ---
 
@@ -356,3 +369,5 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 24. i do want to actually ship one or two before submission, #1 (consensus vs outlier) + #2 (vig/tightness aggregate)
 
 25. also, build_stake_weights seems cool lets add that and a follow up question example for it
+
+26. Amazing! as a last final edit before project completion, can you review the repo and update the README and any other docs? also, can we extract DEVLOG_FINAL_SUMMARY.md from devlog which is shorter and easier to review -- no required structure just do what you think is valuable for tracing the dev process remember, less is more

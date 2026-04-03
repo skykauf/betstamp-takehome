@@ -11,7 +11,7 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 - GitHub repo (invite **jbetstamp** if private).
 - **Deployed URL** (Vercel, Railway, Fly.io, or equivalent) — live at submission.
 - **README**: setup instructions and architecture decisions.
-- **DEVLOG.md**: required; weighted heavily — maintain it throughout development (see `DEVLOG.md` template sections).
+- **DEVLOG.md**: required; weighted heavily — maintain it throughout development (see `DEVLOG.md` template sections). Optional skim: **`DEVLOG_FINAL_SUMMARY.md`** (condensed timeline only).
 
 ## Data
 
@@ -59,9 +59,8 @@ Automate the morning odds review workflow: **Detect** anomalies, **Analyze** lin
 
 ## Bonus (optional)
 
-- **Streaming** — **`POST /api/chat/stream`** and **`POST /api/brief/stream`** (SSE); initial briefing shows live tool calls, then **`brief_done`** with parsed JSON (`run_agent_stream` in `services/agent.py`, `templates/index.html`).
-- Arbitrage detection — `scan_cross_book_arbitrage` (`services/arbitrage.py`).
-- Confidence scoring — briefing JSON + UI (`confidence` / `confidence_basis`).
+- **Streaming** — SSE for chat and briefing (`services/sse.py`, `run_agent_stream`); UI shows tool activity during the run.
+- **Confidence** — briefing JSON + UI (`confidence` / `confidence_basis` on anomalies and value rows).
 
 ## Evaluation rubric (what reviewers weight)
 
