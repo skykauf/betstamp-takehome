@@ -23,7 +23,7 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 **What happened**
 
-- **`services/stake_weights.py` — `build_stake_weights(odds_side_a, odds_side_b, total_stake?)`:** converts American → decimal, stake fractions `D_B/(D_A+D_B)` so dollar return matches either outcome; optional **`total_stake`** for per-leg amounts and **`equal_payout_amount`**; flags **`is_strict_two_way_arb`** when implied sum &lt; 1.
+- **`services/stake_weights.py` — `build_stake_weights(odds_side_a, odds_side_b, total_stake?)`:** converts American → decimal, stake fractions `D_B/(D_A+D_B)` so dollar return matches either outcome; optional **`total_stake`** for per-leg amounts and **`equal_payout_amount`**; flags **`is_strict_two_way_arb`** when implied sum is below 1.
 - **Agent** tool + **system prompt** bullet (use after **`scan_cross_book_arbitrage`** or any two-sided quote).
 - **UI:** demo follow-up **Arb stake split (build_stake_weights)** in **`templates/index.html`**.
 - **Tests:** **`tests/test_stake_weights.py`**.
