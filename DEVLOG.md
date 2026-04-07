@@ -21,6 +21,40 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-07T20:35:00Z — DraftKings NBA endpoint smoke-test script
+
+**What happened**
+
+- Added **`scripts/test_draftkings_nba_odds.py`** to call a working DraftKings endpoint (no third-party odds API):  
+  `sportsbook-nash.draftkings.com/.../leagueSubcategory/v1/markets` with NBA league id **`42648`** and subcategory **`4511`**.
+- Script uses browser-aligned headers and optional **`DK_COOKIE`** env var for local sessions, then writes the raw payload (default **`data/draftkings_nba_raw.json`**) for debugging / future transform work.
+- Added concise console summary: event count, market/selection counts, per-game start times, and moneyline selections with American odds.
+- Added **`--insecure`** flag for local environments missing CA roots (default remains TLS-verified).
+
+**Decision**
+
+- Keep this as a **test utility** first (not app runtime ingestion) so the endpoint contract can be validated safely before wiring into agent/chat flows.
+
+---
+
+## 2026-04-07T21:05:00Z — Chat tools can switch to live DraftKings NBA snapshot
+
+**What happened**
+
+- Added **`services/draftkings_odds.py`**: fetch + normalize from DraftKings leagueSubcategory endpoint into the app's internal row schema (`game_id`, teams, markets, last_updated).
+- Added dataset source switching in **`services/odds_repository.py`** via in-memory runtime payload (`use_runtime_payload` / `clear_runtime_payload`); all core readers now use the active payload.
+- Added agent tools in **`services/agent.py`**:
+  - **`refresh_draftkings_nba_odds`**: fetch latest DraftKings NBA odds and switch active dataset.
+  - **`use_sample_odds_dataset`**: revert active dataset to bundled sample JSON.
+- Updated **`services/prompts/system_prompt.md`** so "latest/current/live DraftKings NBA" requests trigger refresh first.
+- Added tests in **`tests/test_draftkings_odds.py`** for payload normalization and runtime dataset switching.
+
+**Decision**
+
+- Keep DraftKings data in-memory for now (per instance/session) to avoid mutating the repository sample file and keep fallback deterministic.
+
+---
+
 ## 2026-04-04T07:30:00Z — Chat copy buttons + live briefing "last updated"
 
 **What happened**
@@ -405,3 +439,16 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 31. go ahead and continue
 
 32. go ahead and remove all code enabling "Add in to the chat app to grab the latest draftkings NBA odds"
+
+33. can you try grabbing latest draftkings nba odds from draftkings, not any other site?
+
+34. can you do this by pretending to be a web user to get around 403 errors?
+
+35. i found an endpoint you can use! here is request info that worked in my browser
+    
+    can you make a test script for pulling odds from this api?
+    
+    Request URL
+    https://sportsbook-nash.draftkings.com/sites/US-SB/api/sportscontent/controldata/league/leagueSubcategory/v1/markets?isBatchable=false&templateVars=42648&eventsQuery=%24filter%3DleagueId%20eq%20%2742648%27%20AND%20clientMetadata%2FSubcategories%2Fany%28s%3A%20s%2FId%20eq%20%274511%27%29&marketsQuery=%24filter%3DclientMetadata%2FsubCategoryId%20eq%20%274511%27%20AND%20tags%2Fall%28t%3A%20t%20ne%20%27SportcastBetBuilder%27%29&include=Events&entity=events
+
+36. this is awesome! can we now use this to Add in to the chat app to grab the latest draftkings NBA odds

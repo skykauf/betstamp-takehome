@@ -15,6 +15,7 @@ from services import (
     book_tightness,
     consensus_outlier,
     database,
+    draftkings_odds,
     math_odds,
     odds_repository,
     stake_weights,
@@ -40,7 +41,7 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
         ),
         function_tool(
             "list_games",
-            "List all games in the sample with game_id, teams, commence_time.",
+            "List all games in the currently active odds dataset with game_id, teams, commence_time.",
         ),
         function_tool(
             "get_odds_for_game",
@@ -131,6 +132,26 @@ def _tool_definitions(include_sql: bool) -> list[dict[str, Any]]:
                     "description": "Defaults to all three if omitted or empty.",
                 },
             },
+        ),
+        function_tool(
+            "refresh_draftkings_nba_odds",
+            (
+                "Fetch latest NBA lines from DraftKings endpoint and switch the in-memory active dataset "
+                "to that live DraftKings snapshot for subsequent tool calls in this server instance."
+            ),
+            properties={
+                "timeout_seconds": {
+                    "type": "number",
+                    "description": "Optional HTTP timeout in seconds (default 20).",
+                }
+            },
+        ),
+        function_tool(
+            "use_sample_odds_dataset",
+            (
+                "Reset active dataset back to bundled sample_odds_data.json (turn off live DraftKings "
+                "snapshot for this server instance)."
+            ),
         ),
         function_tool(
             "american_to_implied",
@@ -246,6 +267,24 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> Any:
             game_id=gid,
             include_markets=inc,
         )
+    if name == "refresh_draftkings_nba_odds":
+        timeout = float(arguments.get("timeout_seconds", 20.0))
+        payload = draftkings_odds.fetch_and_normalize_draftkings_nba(timeout_seconds=timeout)
+        odds_repository.use_runtime_payload(payload)
+        meta = odds_repository.dataset_meta()
+        return {
+            "ok": True,
+            "message": "Active dataset switched to live DraftKings NBA snapshot",
+            "dataset_meta": meta,
+            "raw_counts": payload.get("raw_counts", {}),
+        }
+    if name == "use_sample_odds_dataset":
+        odds_repository.clear_runtime_payload()
+        return {
+            "ok": True,
+            "message": "Active dataset reset to bundled sample JSON",
+            "dataset_meta": odds_repository.dataset_meta(),
+        }
     if name == "american_to_implied":
         p = math_odds.american_to_implied_probability(int(arguments["american"]))
         return {"american": arguments["american"], "implied_probability": p}

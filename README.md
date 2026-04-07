@@ -33,7 +33,7 @@ Open `http://localhost:3000`. API: `GET /api/health`; **`POST /api/brief`** or *
 
 ## Agent capabilities (tools)
 
-List games, per-game lines, staleness list; **`best_line_for_market`**; **`line_vs_consensus`**; **`slate_book_tightness`**; **`scan_cross_book_arbitrage`**; **`build_stake_weights`** (prefer **`game_id` + `two_way_market`** so each leg is the best cross-book price); `american_to_implied`, `compute_two_sided_market`; optional **`run_readonly_sql`**. Briefing JSON is **soft-validated** (`services/briefing_schema.py`); anomalies/value rows include **confidence** + **confidence_basis** (bonus).
+List games, per-game lines, staleness list; **`best_line_for_market`**; **`line_vs_consensus`**; **`slate_book_tightness`**; **`scan_cross_book_arbitrage`**; **`build_stake_weights`** (prefer **`game_id` + `two_way_market`** so each leg is the best cross-book price); live source controls **`refresh_draftkings_nba_odds`** / **`use_sample_odds_dataset`**; `american_to_implied`, `compute_two_sided_market`; optional **`run_readonly_sql`**. Briefing JSON is **soft-validated** (`services/briefing_schema.py`); anomalies/value rows include **confidence** + **confidence_basis** (bonus).
 
 ## Deploy (Vercel)
 
