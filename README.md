@@ -25,6 +25,8 @@ Open `http://localhost:3000`. API: `GET /api/health`; **`POST /api/brief`** or *
 | `MAX_TOOL_ITERATIONS` | No | Tool rounds per request (default **24**, max **64**) |
 | `CORS_ORIGINS` | No | Default `*` |
 
+DraftKings live refresh uses Python-side defaults for request headers/cookie and can be overridden with `DK_COOKIE`, `DK_CLIENT_VERSION`, `DK_WIDGET_VERSION`, and `DK_INSECURE_TLS`.
+
 ## Architecture
 
 - **Routing:** `vercel.json` sends **`/(.*)`** to **`app.py`** so HTML and `/api/*` share one runtime. UI lives in **`templates/`** (served by FastAPI + `/static/app.js`), not as a static-only root — that pattern previously 404’d API routes on Vercel.

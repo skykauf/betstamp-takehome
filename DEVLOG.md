@@ -55,6 +55,22 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-07T21:30:00Z — Python defaults for DraftKings env overrides
+
+**What happened**
+
+- Added Python-side default constants for DraftKings request settings in:
+  - **`services/draftkings_odds.py`** (`DK_DEFAULT_CLIENT_VERSION`, `DK_DEFAULT_WIDGET_VERSION`, `DK_DEFAULT_COOKIE`)
+  - **`scripts/test_draftkings_nba_odds.py`** (matching defaults for local smoke test parity)
+- Environment variables still override those defaults when present (`DK_COOKIE`, `DK_CLIENT_VERSION`, `DK_WIDGET_VERSION`, `DK_INSECURE_TLS`).
+- Updated **`README.md`** env section to clarify the default-vs-override behavior.
+
+**Decision**
+
+- Keep defaults in Python for out-of-the-box behavior while preserving env overrides for rotation and deployment control.
+
+---
+
 ## 2026-04-04T07:30:00Z — Chat copy buttons + live briefing "last updated"
 
 **What happened**
@@ -452,3 +468,9 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
     https://sportsbook-nash.draftkings.com/sites/US-SB/api/sportscontent/controldata/league/leagueSubcategory/v1/markets?isBatchable=false&templateVars=42648&eventsQuery=%24filter%3DleagueId%20eq%20%2742648%27%20AND%20clientMetadata%2FSubcategories%2Fany%28s%3A%20s%2FId%20eq%20%274511%27%29&marketsQuery=%24filter%3DclientMetadata%2FsubCategoryId%20eq%20%274511%27%20AND%20tags%2Fall%28t%3A%20t%20ne%20%27SportcastBetBuilder%27%29&include=Events&entity=events
 
 36. this is awesome! can we now use this to Add in to the chat app to grab the latest draftkings NBA odds
+
+37. push it all up and tell me if we need envvars
+
+38. can you set the draftkings cookie to the one used in example for me?
+
+39. push it all up and set all the env vars as defaults in python instead of just the .env

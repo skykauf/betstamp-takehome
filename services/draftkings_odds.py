@@ -22,6 +22,14 @@ DK_DEFAULT_PARAMS = {
     "entity": "events",
 }
 
+DK_DEFAULT_CLIENT_VERSION = "2615.2.1.13"
+DK_DEFAULT_WIDGET_VERSION = "2.9.9"
+DK_DEFAULT_COOKIE = (
+    "ak_bmsc=D298E4E21EECC09D80CA48C6F0B7C76D~000000000000000000000000000000~"
+    "YAAQSdfOF54utGOdAQAAc0udaR9iKOrYD15AnS764FlJhuui/aFJ0Od5qEanC7xyPoKVMcB0QoFQaYw5Xq0ckh9NpEDcq2rk0Bg0/gzaAImvnIeTMV1xrUdCvORNHq+X98XEIYlx+r+7BeRnKyhN0rDSdx8/5fvx5JRyj76nD+eMn4mIMPVdxF9SP1RmqbvF8LsdMkzl73toISWObwcbXLrysTo01FMtiymsmOn1YFYNBSDi3K6n/bPwpOtlresqJzlVLlXSkYEpSEOgQ95ZDU1htS0i31XgCcafFsh3G+HkZ4GnQ4gt2H/Kz4UwN6jgJgLWtTJqHH6RPmb3GLEt/5y7ZZY1ozuYN9MLLZh0YJv5cktE+DCxC7J1E0poRf89o8W8z0DZh9R2CcbmMU35bg==; "
+    "bm_sz=7898BFD0C0DBCE0A597160A547E0332F~YAAQSdfOF58utGOdAQAAc0udaR+l7hpmh8d6ZLgYLeCRCwFOf/s8Qg4DPYTk4jzT+hehJkmLas9lbIwjRUThKwBkhvnPU200Unm8Ul8Oojj+Lcwp7SRJLjPONl2zDgGGcYqzvNsNVXvng60kN+Za1IhzOptoOQ4yq8DffKHgjUZfVJBRQHJ4jU3veCuuJas8447FcDMYj8EULYghNO+OAPAjw1vUtoNK3h0+qYwOVPpSsBVka5+crgNBnswrFeK1EofwB3EXVHVfzAzbEFUdkYlHoAw5FQK/YP+7eEWZ4/tICnBMHoOOYi0nZS9YCAa0MSVAxPNty8prz+pJ/ump44IEG4TJexGMSR+b4aSKH6BYzU/f+l9NlyI=~3487541~3294017"
+)
+
 
 def _iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -80,11 +88,11 @@ def _build_headers() -> dict[str, str]:
         "x-client-feature": "leagueSubcategory",
         "x-client-name": "web",
         "x-client-page": "league",
-        "x-client-version": os.getenv("DK_CLIENT_VERSION", "2615.2.1.13"),
+        "x-client-version": os.getenv("DK_CLIENT_VERSION", DK_DEFAULT_CLIENT_VERSION),
         "x-client-widget-name": "cms",
-        "x-client-widget-version": os.getenv("DK_WIDGET_VERSION", "2.9.9"),
+        "x-client-widget-version": os.getenv("DK_WIDGET_VERSION", DK_DEFAULT_WIDGET_VERSION),
     }
-    cookie = os.getenv("DK_COOKIE", "").strip()
+    cookie = os.getenv("DK_COOKIE", DK_DEFAULT_COOKIE).strip()
     if cookie:
         headers["cookie"] = cookie
     return headers
