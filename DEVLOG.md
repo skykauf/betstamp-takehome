@@ -71,6 +71,16 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-07T21:45:00Z — UI quick action: "Refresh DraftKings now"
+
+**What happened**
+
+- Added a small follow-up button in **`templates/index.html`**: **`Refresh DraftKings now`**.
+- Wired **`templates/app.js`** so the button sends an explicit chat prompt instructing the agent to run **`refresh_draftkings_nba_odds`** and confirm the active dataset metadata.
+- Updated busy-state handling so the new button disables/enables alongside chat controls based on thread readiness.
+
+---
+
 ## 2026-04-04T07:30:00Z — Chat copy buttons + live briefing "last updated"
 
 **What happened**
@@ -474,3 +484,7 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 38. can you set the draftkings cookie to the one used in example for me?
 
 39. push it all up and set all the env vars as defaults in python instead of just the .env
+
+40. add a tiny “Refresh DraftKings now” UI button that posts a chat prompt to trigger refresh_draftkings_nba_odds explicitly.
+    
+    push it up

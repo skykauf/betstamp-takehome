@@ -319,6 +319,7 @@
   function setBusy(b) {
     $("run-brief").disabled = b;
     $("send-chat").disabled = b || !threadId;
+    $("refresh-dk-now").disabled = b || !threadId;
     $("chat-input").disabled = b || !threadId;
     if (threadId && !b) setDemoPromptsEnabled(true);
     else if (!threadId || b) setDemoPromptsEnabled(false);
@@ -469,6 +470,10 @@
   };
 
   $("send-chat").onclick = () => sendChatMessage($("chat-input").value);
+  $("refresh-dk-now").onclick = () =>
+    sendChatMessage(
+      "Please call refresh_draftkings_nba_odds now, then confirm dataset source and record count."
+    );
 
   $("chat-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
