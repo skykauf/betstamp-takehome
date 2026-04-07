@@ -23,6 +23,33 @@ def test_api_health(client):
     assert r.json() == {"ok": True}
 
 
+@patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+def test_healthz_ready(client):
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+@patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+def test_healthz_not_ready_missing_key(client):
+    r = client.get("/healthz")
+    assert r.status_code == 503
+    body = r.json()["detail"]
+    assert body["ok"] is False
+    assert body["has_openai_key"] is False
+
+
+@patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+@patch("app.dataset_meta", side_effect=FileNotFoundError("Missing odds file"))
+def test_healthz_not_ready_missing_dataset(_, client):
+    r = client.get("/healthz")
+    assert r.status_code == 503
+    body = r.json()["detail"]
+    assert body["ok"] is False
+    assert body["dataset_loaded"] is False
+    assert "Missing odds file" in body["dataset_error"]
+
+
 def test_api_chat_unknown_thread(client):
     r = client.post(
         "/api/chat",

@@ -21,6 +21,7 @@ from services.agent import (
     run_agent,
 )
 from services.config import cors_origins
+from services.odds_repository import dataset_meta
 from services.sse import (
     AgentStreamOutcome,
     SSE_MEDIA_TYPE,
@@ -83,6 +84,34 @@ class ChatBody(BaseModel):
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/healthz")
+def healthz():
+    has_openai_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+
+    dataset_loaded = False
+    dataset_error: str | None = None
+    try:
+        meta = dataset_meta()
+        dataset_loaded = meta.get("record_count", 0) > 0
+        if not dataset_loaded:
+            dataset_error = "odds dataset is empty"
+    except Exception as exc:
+        dataset_error = str(exc)
+
+    if has_openai_key and dataset_loaded:
+        return {"ok": True}
+
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "ok": False,
+            "has_openai_key": has_openai_key,
+            "dataset_loaded": dataset_loaded,
+            "dataset_error": dataset_error,
+        },
+    )
 
 
 @app.post("/api/brief")
