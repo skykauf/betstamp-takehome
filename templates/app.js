@@ -3,9 +3,118 @@
 
   const $ = (id) => document.getElementById(id);
   let threadId = null;
+  const chatMessages = [];
+  let briefingUpdatedAtMs = null;
+  let briefingUpdatedTicker = null;
 
   function asArray(x) {
     return Array.isArray(x) ? x : [];
+  }
+
+  function addChatMessage(role, text, tools) {
+    chatMessages.push({
+      role: role || "agent",
+      text: text == null ? "" : String(text),
+      tools: Array.isArray(tools) ? tools : null,
+    });
+    renderChatLog();
+  }
+
+  function updateLastAgentMessage(text, tools) {
+    if (!chatMessages.length || chatMessages[chatMessages.length - 1].role !== "agent") {
+      addChatMessage("agent", text, tools);
+      return;
+    }
+    const idx = chatMessages.length - 1;
+    chatMessages[idx].text = text == null ? "" : String(text);
+    chatMessages[idx].tools = Array.isArray(tools) ? tools : null;
+    renderChatLog();
+  }
+
+  function relativeAge(ms) {
+    if (ms == null) return "—";
+    const deltaSec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    if (deltaSec < 10) return "just now";
+    if (deltaSec < 60) return deltaSec + "s ago";
+    const mins = Math.floor(deltaSec / 60);
+    if (mins < 60) return mins + "m ago";
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + "h ago";
+    const days = Math.floor(hours / 24);
+    return days + "d ago";
+  }
+
+  function renderBriefingUpdatedLabel() {
+    $("briefing-last-updated").textContent = "Last updated: " + relativeAge(briefingUpdatedAtMs);
+  }
+
+  function startBriefingUpdatedTicker() {
+    if (briefingUpdatedTicker != null) window.clearInterval(briefingUpdatedTicker);
+    renderBriefingUpdatedLabel();
+    briefingUpdatedTicker = window.setInterval(renderBriefingUpdatedLabel, 1000);
+  }
+
+  function renderChatLog() {
+    const root = $("chat-log");
+    while (root.firstChild) root.removeChild(root.firstChild);
+    if (!chatMessages.length) {
+      root.textContent = "—";
+      return;
+    }
+    chatMessages.forEach((m, idx) => {
+      const item = document.createElement("div");
+      item.className = "chat-msg";
+
+      const head = document.createElement("div");
+      head.className = "chat-msg-head";
+
+      const role = document.createElement("span");
+      role.className = "chat-msg-role";
+      role.textContent = m.role === "user" ? "You" : "Agent";
+      head.appendChild(role);
+
+      if (m.role === "agent") {
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "chat-msg-copy";
+        copyBtn.textContent = "Copy";
+        copyBtn.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(m.text || "");
+            copyBtn.textContent = "Copied";
+            window.setTimeout(() => {
+              copyBtn.textContent = "Copy";
+            }, 1200);
+          } catch (_) {
+            copyBtn.textContent = "Failed";
+            window.setTimeout(() => {
+              copyBtn.textContent = "Copy";
+            }, 1200);
+          }
+        };
+        head.appendChild(copyBtn);
+      } else {
+        const spacer = document.createElement("span");
+        spacer.textContent = " ";
+        head.appendChild(spacer);
+      }
+      item.appendChild(head);
+
+      const body = document.createElement("p");
+      body.className = "chat-msg-body";
+      body.textContent = m.text || "";
+      item.appendChild(body);
+
+      if (m.role === "agent" && m.tools && m.tools.length) {
+        const tools = document.createElement("div");
+        tools.className = "chat-msg-tools";
+        tools.textContent = "tools: " + JSON.stringify(m.tools);
+        item.appendChild(tools);
+      }
+
+      root.appendChild(item);
+    });
+    root.scrollTop = root.scrollHeight;
   }
 
   function clearBriefing(el) {
@@ -249,13 +358,11 @@
     const t = (text || "").trim();
     if (!t || !threadId) return;
     setBusy(true);
-    const prev = $("chat-log").textContent;
-    const header =
-      (prev && prev !== "—" ? prev + "\n\n---\n\n" : "") + "You: " + t + "\n\nAgent: ";
     $("chat-input").value = "";
+    addChatMessage("user", t);
+    addChatMessage("agent", "…");
     let agentText = "";
     const toolsRunning = [];
-    $("chat-log").textContent = header + "…";
     try {
       const r = await fetch("/api/chat/stream", {
         method: "POST",
@@ -272,31 +379,20 @@
         }
         if (evt.event === "delta" && evt.text) {
           agentText += evt.text;
-          const toolLine =
-            toolsRunning.length > 0
-              ? "\n\n(tools running: " + toolsRunning.join(", ") + ")"
-              : "";
-          $("chat-log").textContent = header + agentText + toolLine;
+          const toolTrace = toolsRunning.map((name) => ({ name: name, state: "running" }));
+          updateLastAgentMessage(agentText, toolTrace);
         } else if (evt.event === "tool" && evt.name) {
           toolsRunning.push(evt.name);
-          $("chat-log").textContent =
-            header +
-            agentText +
-            "\n\n(tools running: " +
-            toolsRunning.join(", ") +
-            ")";
+          const textNow = agentText || "…";
+          const toolTrace = toolsRunning.map((name) => ({ name: name, state: "running" }));
+          updateLastAgentMessage(textNow, toolTrace);
         } else if (evt.event === "done") {
           agentText = evt.reply != null ? String(evt.reply) : agentText;
-          $("chat-log").textContent =
-            header +
-            agentText +
-            "\n\n(tools: " +
-            JSON.stringify(evt.tool_trace || []) +
-            ")";
+          updateLastAgentMessage(agentText, evt.tool_trace || []);
         }
       });
     } catch (e) {
-      $("chat-log").textContent = prev + "\n\nError: " + e.message;
+      updateLastAgentMessage("Error: " + e.message, null);
     } finally {
       setBusy(false);
     }
@@ -314,6 +410,8 @@
     $("briefing").appendChild(waitP);
     $("trace").textContent = "—";
     $("thread-label").textContent = "Generating briefing…";
+    briefingUpdatedAtMs = null;
+    renderBriefingUpdatedLabel();
     resetBriefingActivityPanel();
     let gotBriefDone = false;
     try {
@@ -347,7 +445,10 @@
           renderBriefing(evt.briefing || {});
           $("trace").textContent = JSON.stringify(evt.tool_trace || [], null, 2);
           $("trace-wrap").open = true;
-          $("chat-log").textContent = "—";
+          chatMessages.length = 0;
+          renderChatLog();
+          briefingUpdatedAtMs = Date.now();
+          startBriefingUpdatedTicker();
           hideBriefingActivityPanel();
         }
       });
@@ -384,4 +485,6 @@
     $("chat-input").value = q;
     sendChatMessage(q);
   });
+  renderBriefingUpdatedLabel();
+  renderChatLog();
 })();

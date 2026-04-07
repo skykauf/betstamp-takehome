@@ -54,7 +54,22 @@
     }
     .demo-q:hover:not(:disabled) { border-color: #94a3b8; background: #f1f5f9; }
     .demo-q:disabled { cursor: not-allowed; opacity: 0.55; }
-    #chat-log { white-space: pre-wrap; word-break: break-word; }
+    #chat-log { display: flex; flex-direction: column; gap: 0.6rem; }
+    .chat-msg {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.75rem;
+    }
+    .chat-msg-head {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;
+      font-size: 0.82rem; color: #475569;
+    }
+    .chat-msg-role { font-weight: 600; text-transform: capitalize; }
+    .chat-msg-copy {
+      background: #fff; color: #0f172a; border: 1px solid #cbd5e1;
+      padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.78rem;
+    }
+    .chat-msg-copy:hover:not(:disabled) { background: #f1f5f9; border-color: #94a3b8; }
+    .chat-msg-body { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 0.9rem; }
+    .chat-msg-tools { margin-top: 0.35rem; font-size: 0.78rem; color: #64748b; white-space: pre-wrap; }
 
     #briefing-activity-section { display: none; }
     #briefing-activity-section.is-live { display: block; }
@@ -87,7 +102,10 @@
   </section>
 
   <section>
-    <h2 style="font-size:1rem;">Briefing</h2>
+    <div class="row" style="justify-content:space-between;align-items:baseline;">
+      <h2 style="font-size:1rem;margin:0;">Briefing</h2>
+      <span class="muted" id="briefing-last-updated">Last updated: —</span>
+    </div>
     <div id="briefing" class="briefing" aria-live="polite">
       <p class="muted" style="margin:0;">Run a briefing to see the analyst summary.</p>
     </div>
@@ -120,7 +138,7 @@
     </ul>
     <textarea id="chat-input" placeholder="Ask about the briefing…" disabled></textarea>
     <p><button type="button" id="send-chat" disabled>Send</button></p>
-    <pre id="chat-log">—</pre>
+    <div id="chat-log" class="trace" aria-live="polite">—</div>
   </section>
 
   <script src="/static/app.js"></script>

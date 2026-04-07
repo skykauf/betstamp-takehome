@@ -21,6 +21,16 @@ Add entries as you build. Each substantive session should touch at least one of:
 
 ---
 
+## 2026-04-04T07:30:00Z — Chat copy buttons + live briefing "last updated"
+
+**What happened**
+
+- **`templates/app.js`**: chat log now renders structured message cards (user/agent) instead of one flat text block; every **agent** message has a **Copy** button using `navigator.clipboard`.
+- **`templates/index.html`**: added a **`Last updated:`** label beside the Briefing header.
+- **`templates/app.js`**: when a briefing finishes (`brief_done`), capture timestamp and tick a relative age label (`just now`, `42s ago`, `2m ago`, etc.) live.
+
+---
+
 ## 2026-04-04T07:00:00Z — `build_stake_weights` uses best cross-book prices per game
 
 **What happened**
@@ -382,3 +392,16 @@ Verbatim user messages from the Cursor thread used to build this project (chrono
 26. Amazing! as a last final edit before project completion, can you review the repo and update the README and any other docs? also, can we extract DEVLOG_FINAL_SUMMARY.md from devlog which is shorter and easier to review -- no required structure just do what you think is valuable for tracing the dev process remember, less is more
 
 27. build stake weights should be used with the best odds available for a given game
+
+28. can you help me add this feature? @Untitled-1 (2-3)
+
+29. please implement
+    Add in to the chat app to grab the latest draftkings NBA odds
+
+30. i don't want to use any external odds api , i want to retrieve the current odds from the draftkings
+    you can find them on this page:
+    https://sportsbook.draftkings.com/leagues/basketball/nba
+
+31. go ahead and continue
+
+32. go ahead and remove all code enabling "Add in to the chat app to grab the latest draftkings NBA odds"
